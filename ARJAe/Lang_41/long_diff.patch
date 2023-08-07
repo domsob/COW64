@@ -174,15 +174,7 @@ public class ClassUtils {
      }
  
      /**
-@@ -229,7 +229,7 @@
-         if (cls == null) {
-             return StringUtils.EMPTY;
-         }
--        return getPackageName(cls.getName());
-+        return getPackageCanonicalName(cls.getName());
-     }
- 
-     /**
+
      * <p>Gets the class name minus the package name from a String.</p>
      *
      * <p>The string passed in is assumed to be a class name - it is not checked.</p>
@@ -236,13 +228,14 @@ public class ClassUtils {
      * @return the package name or an empty string
      */
     public static String getPackageName(Class<?> cls) {
-        if (cls == null) {
-            return StringUtils.EMPTY;
-        }
-        return getPackageName(cls.getName());
-    }
-
-    /**
+         if (cls == null) {
+             return StringUtils.EMPTY;
+         }
+-        return getPackageName(cls.getName());
++        return getPackageCanonicalName(cls.getName());
+     }
+ 
+     /**
      * <p>Gets the package name from a <code>String</code>.</p>
      *
      * <p>The string passed in is assumed to be a class name - it is not checked.</p>

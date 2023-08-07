@@ -118,17 +118,7 @@ public class TypeUtils {
  
          // only a null type can be assigned to null type which
          // would have cause the previous to return true
-@@ -673,8 +670,10 @@
- 
-         // has target class been reached?
-         if (cls.getTypeParameters().length > 0 || toClass.equals(cls)) {
-+            if (toClass.equals(cls)) {
-             return typeVarAssigns;
-         }
-+        }
- 
-         // walk the inheritance hierarchy until the target class is reached
-         return getTypeArguments(getClosestParentType(cls, toClass), toClass, typeVarAssigns);
+
         if (toClass == null) {
             return false;
         }
@@ -677,16 +667,20 @@ public class TypeUtils {
 
             // work with wrapper the wrapper class instead of the primitive
             cls = ClassUtils.primitiveToWrapper(cls);
-        }
+        } 
+         // walk the inheritance hierarchy until the target class is reached
+         return getTypeArguments(getClosestParentType(cls, toClass), toClass, typeVarAssigns);
 
         // create a copy of the incoming map, or an empty one if it's null
         HashMap<TypeVariable<?>, Type> typeVarAssigns = subtypeVarAssigns == null ? new HashMap<TypeVariable<?>, Type>()
                 : new HashMap<TypeVariable<?>, Type>(subtypeVarAssigns);
 
-        // has target class been reached?
-        if (cls.getTypeParameters().length > 0 || toClass.equals(cls)) {
-            return typeVarAssigns;
-        }
+         // has target class been reached?
+         if (cls.getTypeParameters().length > 0 || toClass.equals(cls)) {
++            if (toClass.equals(cls)) {
+             return typeVarAssigns;
+         }
++        }
 
         // walk the inheritance hierarchy until the target class is reached
         return getTypeArguments(getClosestParentType(cls, toClass), toClass, typeVarAssigns);
@@ -782,6 +776,9 @@ public class TypeUtils {
         // use List view of type parameters of cls so the contains() method can be used:
         List<TypeVariable<Class<T>>> typeVarList = Arrays.asList(cls
                 .getTypeParameters());
+
+
+                
 
         for (int i = 0; i < typeArgs.length; i++) {
             TypeVariable<?> typeVar = typeVars[i];

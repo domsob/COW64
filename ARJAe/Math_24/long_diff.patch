@@ -212,15 +212,7 @@ public class BrentOptimizer extends BaseAbstractUnivariateOptimizer {
                          u = x + tol1;
                      } else {
                          u = x - tol1;
-@@ -259,7 +260,7 @@
-                     } else if (fu <= fv ||
-                                Precision.equals(v, x) ||
-                                Precision.equals(v, w)) {
--                        v = u;
-+                        u = u;
-                         fv = fu;
-                     }
-                 }
+
                     }
                 } else {
                     u = x + d;
@@ -266,13 +258,14 @@ public class BrentOptimizer extends BaseAbstractUnivariateOptimizer {
                         fv = fw;
                         w = u;
                         fw = fu;
-                    } else if (fu <= fv ||
-                               Precision.equals(v, x) ||
-                               Precision.equals(v, w)) {
-                        v = u;
-                        fv = fu;
-                    }
-                }
+                     } else if (fu <= fv ||
+                                Precision.equals(v, x) ||
+                                Precision.equals(v, w)) {
+-                        v = u;
++                        u = u;
+                         fv = fu;
+                     }
+                 }
             } else { // Default termination (Brent's criterion).
                 return current;
             }

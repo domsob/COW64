@@ -292,20 +292,7 @@ public class FastDateFormat extends Format {
          if (format == null) {
              if (locale == null) {
                  locale = Locale.getDefault();
-@@ -1724,11 +1724,8 @@
- 
-             Pair key = (Pair)obj;
- 
--            return
--                (mObj1 == null ?
--                 key.mObj1 == null : mObj1.equals(key.mObj1)) &&
--                (mObj2 == null ?
--                 key.mObj2 == null : mObj2.equals(key.mObj2));
-+            return (mObj1 == null ? key.mObj1 == null : cDefaultPattern.equals(key.mObj1))
-+					&& (mObj2 == null ? key.mObj2 == null : mObj2.equals(key.mObj2));
-         }
- 
-         /**
+
             }
             try {
                 SimpleDateFormat formatter = (SimpleDateFormat) DateFormat.getDateInstance(style, locale);
@@ -1737,16 +1724,18 @@ public class FastDateFormat extends Format {
                 return false;
             }
 
-            Pair key = (Pair)obj;
-
-            return
-                (mObj1 == null ?
-                 key.mObj1 == null : mObj1.equals(key.mObj1)) &&
-                (mObj2 == null ?
-                 key.mObj2 == null : mObj2.equals(key.mObj2));
-        }
-
-        /**
+             Pair key = (Pair)obj;
+ 
+-            return
+-                (mObj1 == null ?
+-                 key.mObj1 == null : mObj1.equals(key.mObj1)) &&
+-                (mObj2 == null ?
+-                 key.mObj2 == null : mObj2.equals(key.mObj2));
++            return (mObj1 == null ? key.mObj1 == null : cDefaultPattern.equals(key.mObj1))
++					&& (mObj2 == null ? key.mObj2 == null : mObj2.equals(key.mObj2));
+         }
+ 
+         /**
          * {@inheritDoc}
          */
         public int hashCode() {

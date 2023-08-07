@@ -150,15 +150,6 @@ public abstract class ToStringStyle implements Serializable {
      }
  
      /**
-@@ -161,6 +161,8 @@
-      */
-     static boolean isRegistered(Object value) {
-         Map<Object, Object> m = getRegistry();
-+        if (!(m != null))
-+			return false;
-         return m.containsKey(value);
-     }
- 
      * <p>
      * Returns <code>true</code> if the registry contains the given object.
      * Used by the reflection methods to avoid infinite loops.
@@ -169,10 +160,12 @@ public abstract class ToStringStyle implements Serializable {
      * @return boolean <code>true</code> if the registry contains the given
      *             object.
      */
-    static boolean isRegistered(Object value) {
-        Map<Object, Object> m = getRegistry();
-        return m.containsKey(value);
-    }
+     static boolean isRegistered(Object value) {
+         Map<Object, Object> m = getRegistry();
++        if (!(m != null))
++			return false;
+         return m.containsKey(value);
+     }
 
     /**
      * <p>

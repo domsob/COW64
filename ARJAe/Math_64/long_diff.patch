@@ -432,17 +432,7 @@ public class LevenbergMarquardtOptimizer extends AbstractLeastSquaresOptimizer {
                      tmpVec    = residuals;
                      residuals = oldRes;
                      oldRes    = tmpVec;
-@@ -547,6 +548,10 @@
- 
-         // calculate an upper bound, paru, for the zero of the function
-         sum2 = 0;
-+        for (int k = 0; k < solvedCols; ++k) {
-+			int pk = permutation[k];
-+			jacobian[k][pk] = diagR[pk];
-+		}
-         for (int j = 0; j < solvedCols; ++j) {
-             int pj = permutation[j];
-             double sum = 0;
+
                 }
                 if (checker==null) {
                 	if (((Math.abs(actRed) <= costRelativeTolerance) &&
@@ -556,12 +546,15 @@ public class LevenbergMarquardtOptimizer extends AbstractLeastSquaresOptimizer {
             }
             parl = fp / (delta * sum2);
         }
-
-        // calculate an upper bound, paru, for the zero of the function
-        sum2 = 0;
-        for (int j = 0; j < solvedCols; ++j) {
-            int pj = permutation[j];
-            double sum = 0;
+         // calculate an upper bound, paru, for the zero of the function
+         sum2 = 0;
++        for (int k = 0; k < solvedCols; ++k) {
++			int pk = permutation[k];
++			jacobian[k][pk] = diagR[pk];
++		}
+         for (int j = 0; j < solvedCols; ++j) {
+             int pj = permutation[j];
+             double sum = 0;
             for (int i = 0; i <= j; ++i) {
                 sum += jacobian[i][pj] * qy[i];
             }
