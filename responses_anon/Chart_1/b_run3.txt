@@ -1,0 +1,1174 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.jfree.chart.renderer.category;
+o 
+o import java.awt.AlphaComposite;
+o import java.awt.Composite;
+o import java.awt.Font;
+o import java.awt.GradientPaint;
+o import java.awt.Graphics2D;
+o import java.awt.Paint;
+o import java.awt.Rectangle;
+o import java.awt.Shape;
+o import java.awt.Stroke;
+o import java.awt.geom.Ellipse2D;
+o import java.awt.geom.Line2D;
+o import java.awt.geom.Point2D;
+o import java.awt.geom.Rectangle2D;
+o import java.io.Serializable;
+o import java.util.ArrayList;
+o import java.util.Iterator;
+o import java.util.List;
+o 
+o import org.jfree.chart.ChartRenderingInfo;
+o import org.jfree.chart.LegendItem;
+o import org.jfree.chart.LegendItemCollection;
+o import org.jfree.chart.RenderingSource;
+o import org.jfree.chart.annotations.CategoryAnnotation;
+o import org.jfree.chart.axis.CategoryAxis;
+o import org.jfree.chart.axis.ValueAxis;
+o import org.jfree.chart.entity.CategoryItemEntity;
+o import org.jfree.chart.entity.EntityCollection;
+o import org.jfree.chart.event.RendererChangeEvent;
+o import org.jfree.chart.labels.CategoryItemLabelGenerator;
+o import org.jfree.chart.labels.CategorySeriesLabelGenerator;
+o import org.jfree.chart.labels.CategoryToolTipGenerator;
+o import org.jfree.chart.labels.ItemLabelPosition;
+o import org.jfree.chart.labels.StandardCategorySeriesLabelGenerator;
+o import org.jfree.chart.plot.CategoryCrosshairState;
+o import org.jfree.chart.plot.CategoryMarker;
+o import org.jfree.chart.plot.CategoryPlot;
+o import org.jfree.chart.plot.DrawingSupplier;
+o import org.jfree.chart.plot.IntervalMarker;
+o import org.jfree.chart.plot.Marker;
+o import org.jfree.chart.plot.PlotOrientation;
+o import org.jfree.chart.plot.PlotRenderingInfo;
+o import org.jfree.chart.plot.ValueMarker;
+o import org.jfree.chart.renderer.AbstractRenderer;
+o import org.jfree.chart.text.TextUtilities;
+o import org.jfree.chart.urls.CategoryURLGenerator;
+o import org.jfree.chart.util.GradientPaintTransformer;
+o import org.jfree.chart.util.Layer;
+o import org.jfree.chart.util.LengthAdjustmentType;
+o import org.jfree.chart.util.ObjectList;
+o import org.jfree.chart.util.ObjectUtilities;
+o import org.jfree.chart.util.PublicCloneable;
+o import org.jfree.chart.util.RectangleAnchor;
+o import org.jfree.chart.util.RectangleEdge;
+o import org.jfree.chart.util.RectangleInsets;
+o import org.jfree.chart.util.SortOrder;
+o import org.jfree.data.Range;
+o import org.jfree.data.category.CategoryDataset;
+o import org.jfree.data.category.CategoryDatasetSelectionState;
+o import org.jfree.data.category.SelectableCategoryDataset;
+o import org.jfree.data.general.DatasetUtilities;
+o 
+o public abstract class AbstractCategoryItemRenderer extends AbstractRenderer
+o         implements CategoryItemRenderer, Cloneable, PublicCloneable,
+o         Serializable {
+o 
+o     private static final long serialVersionUID = 1247553218442497391L;
+o 
+o     private CategoryPlot plot;
+o 
+o     private ObjectList itemLabelGeneratorList;
+o 
+o     private CategoryItemLabelGenerator baseItemLabelGenerator;
+o 
+o     private ObjectList toolTipGeneratorList;
+o 
+o     private CategoryToolTipGenerator baseToolTipGenerator;
+o 
+o     private ObjectList urlGeneratorList;
+o 
+o     private CategoryURLGenerator baseURLGenerator;
+o 
+o     private CategorySeriesLabelGenerator legendItemLabelGenerator;
+o 
+o     private CategorySeriesLabelGenerator legendItemToolTipGenerator;
+o 
+o     private CategorySeriesLabelGenerator legendItemURLGenerator;
+o 
+o     private List backgroundAnnotations;
+o 
+o     private List foregroundAnnotations;
+o 
+o     private transient int rowCount;
+o 
+o     private transient int columnCount;
+o 
+o     protected AbstractCategoryItemRenderer() {
+o         this.itemLabelGeneratorList = new ObjectList();
+o         this.toolTipGeneratorList = new ObjectList();
+o         this.urlGeneratorList = new ObjectList();
+o         this.legendItemLabelGenerator
+o                 = new StandardCategorySeriesLabelGenerator();
+o         this.backgroundAnnotations = new ArrayList();
+o         this.foregroundAnnotations = new ArrayList();
+o     }
+o 
+o     public int getPassCount() {
+o         return 1;
+o     }
+o 
+o     public CategoryPlot getPlot() {
+o         return this.plot;
+o     }
+o 
+o     public void setPlot(CategoryPlot plot) {
+o         if (plot == null) {
+o             throw new IllegalArgumentException("Null 'plot' argument.");
+o         }
+o         this.plot = plot;
+o     }
+o 
+o     public CategoryItemLabelGenerator getItemLabelGenerator(int row,
+o             int column, boolean selected) {
+o         CategoryItemLabelGenerator generator = (CategoryItemLabelGenerator)
+o                 this.itemLabelGeneratorList.get(row);
+o         if (generator == null) {
+o             generator = this.baseItemLabelGenerator;
+o         }
+o         return generator;
+o     }
+o 
+o     public CategoryItemLabelGenerator getSeriesItemLabelGenerator(int series) {
+o         return (CategoryItemLabelGenerator) this.itemLabelGeneratorList.get(
+o                 series);
+o     }
+o 
+o     public void setSeriesItemLabelGenerator(int series,
+o             CategoryItemLabelGenerator generator) {
+o         setSeriesItemLabelGenerator(series, generator, true);
+o     }
+o 
+o     public void setSeriesItemLabelGenerator(int series,
+o             CategoryItemLabelGenerator generator, boolean notify) {
+o         this.itemLabelGeneratorList.set(series, generator);
+o         if (notify) {
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o     }
+o 
+o     public CategoryItemLabelGenerator getBaseItemLabelGenerator() {
+o         return this.baseItemLabelGenerator;
+o     }
+o 
+o     public void setBaseItemLabelGenerator(
+o             CategoryItemLabelGenerator generator) {
+o         setBaseItemLabelGenerator(generator, true);
+o     }
+o 
+o     public void setBaseItemLabelGenerator(
+o             CategoryItemLabelGenerator generator, boolean notify) {
+o         this.baseItemLabelGenerator = generator;
+o         if (notify) {
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o     }
+o 
+o     public CategoryToolTipGenerator getToolTipGenerator(int row, int column,
+o             boolean selected) {
+o 
+o         CategoryToolTipGenerator result = null;
+o         result = getSeriesToolTipGenerator(row);
+o         if (result == null) {
+o             result = this.baseToolTipGenerator;
+o         }
+o         return result;
+o     }
+o 
+o     public CategoryToolTipGenerator getSeriesToolTipGenerator(int series) {
+o         return (CategoryToolTipGenerator) this.toolTipGeneratorList.get(series);
+o     }
+o 
+o     public void setSeriesToolTipGenerator(int series,
+o             CategoryToolTipGenerator generator) {
+o         setSeriesToolTipGenerator(series, generator, true);
+o     }
+o 
+o     public void setSeriesToolTipGenerator(int series,
+o             CategoryToolTipGenerator generator, boolean notify) {
+o         this.toolTipGeneratorList.set(series, generator);
+o         if (notify) {
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o     }
+o 
+o     public CategoryToolTipGenerator getBaseToolTipGenerator() {
+o         return this.baseToolTipGenerator;
+o     }
+o 
+o     public void setBaseToolTipGenerator(CategoryToolTipGenerator generator) {
+o         setBaseToolTipGenerator(generator, true);
+o     }
+o 
+o     public void setBaseToolTipGenerator(CategoryToolTipGenerator generator,
+o             boolean notify) {
+o         this.baseToolTipGenerator = generator;
+o         if (notify) {
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o     }
+o 
+o     public CategoryURLGenerator getURLGenerator(int row, int column, boolean
+o             selected) {
+o         CategoryURLGenerator generator
+o                 = (CategoryURLGenerator) this.urlGeneratorList.get(row);
+o         if (generator == null) {
+o             generator = this.baseURLGenerator;
+o         }
+o         return generator;
+o     }
+o 
+o     public CategoryURLGenerator getSeriesURLGenerator(int series) {
+o         return (CategoryURLGenerator) this.urlGeneratorList.get(series);
+o     }
+o 
+o     public void setSeriesURLGenerator(int series,
+o             CategoryURLGenerator generator) {
+o         setSeriesURLGenerator(series, generator, true);
+o     }
+o 
+o     public void setSeriesURLGenerator(int series,
+o             CategoryURLGenerator generator, boolean notify) {
+o         this.urlGeneratorList.set(series, generator);
+o         if (notify) {
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o     }
+o 
+o     public CategoryURLGenerator getBaseURLGenerator() {
+o         return this.baseURLGenerator;
+o     }
+o 
+o     public void setBaseURLGenerator(CategoryURLGenerator generator) {
+o         setBaseURLGenerator(generator, true);
+o     }
+o 
+o     public void setBaseURLGenerator(CategoryURLGenerator generator,
+o             boolean notify) {
+o         this.baseURLGenerator = generator;
+o         if (notify) {
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o     }
+o 
+o     public void addAnnotation(CategoryAnnotation annotation) {
+o         
+o         addAnnotation(annotation, Layer.FOREGROUND);
+o     }
+o 
+o     public void addAnnotation(CategoryAnnotation annotation, Layer layer) {
+o         if (annotation == null) {
+o             throw new IllegalArgumentException("Null 'annotation' argument.");
+o         }
+o         if (layer.equals(Layer.FOREGROUND)) {
+o             this.foregroundAnnotations.add(annotation);
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o         else if (layer.equals(Layer.BACKGROUND)) {
+o             this.backgroundAnnotations.add(annotation);
+o             notifyListeners(new RendererChangeEvent(this));
+o         }
+o         else {
+o             
+o             throw new RuntimeException("Unknown layer.");
+o         }
+o     }
+o     
+o     public boolean removeAnnotation(CategoryAnnotation annotation) {
+o         boolean removed = this.foregroundAnnotations.remove(annotation);
+o         removed = removed & this.backgroundAnnotations.remove(annotation);
+o         notifyListeners(new RendererChangeEvent(this));
+o         return removed;
+o     }
+o 
+o     public void removeAnnotations() {
+o         this.foregroundAnnotations.clear();
+o         this.backgroundAnnotations.clear();
+o         notifyListeners(new RendererChangeEvent(this));
+o     }
+o 
+o     public CategorySeriesLabelGenerator getLegendItemLabelGenerator() {
+o         return this.legendItemLabelGenerator;
+o     }
+o 
+o     public void setLegendItemLabelGenerator(
+o             CategorySeriesLabelGenerator generator) {
+o         if (generator == null) {
+o             throw new IllegalArgumentException("Null 'generator' argument.");
+o         }
+o         this.legendItemLabelGenerator = generator;
+o         fireChangeEvent();
+o     }
+o 
+o     public CategorySeriesLabelGenerator getLegendItemToolTipGenerator() {
+o         return this.legendItemToolTipGenerator;
+o     }
+o 
+o     public void setLegendItemToolTipGenerator(
+o             CategorySeriesLabelGenerator generator) {
+o         this.legendItemToolTipGenerator = generator;
+o         fireChangeEvent();
+o     }
+o 
+o     public CategorySeriesLabelGenerator getLegendItemURLGenerator() {
+o         return this.legendItemURLGenerator;
+o     }
+o 
+o     public void setLegendItemURLGenerator(
+o             CategorySeriesLabelGenerator generator) {
+o         this.legendItemURLGenerator = generator;
+o         fireChangeEvent();
+o     }
+o 
+o     public int getRowCount() {
+o         return this.rowCount;
+o     }
+o 
+o     public int getColumnCount() {
+o         return this.columnCount;
+o     }
+o 
+o     protected CategoryItemRendererState createState(PlotRenderingInfo info) {
+o         CategoryItemRendererState state = new CategoryItemRendererState(info);
+o         int[] visibleSeriesTemp = new int[this.rowCount];
+o         int visibleSeriesCount = 0;
+o         for (int row = 0; row < this.rowCount; row++) {
+o             if (isSeriesVisible(row)) {
+o                 visibleSeriesTemp[visibleSeriesCount] = row;
+o                 visibleSeriesCount++;
+o             }
+o         }
+o         int[] visibleSeries = new int[visibleSeriesCount];
+o         System.arraycopy(visibleSeriesTemp, 0, visibleSeries, 0,
+o                 visibleSeriesCount);
+o         state.setVisibleSeriesArray(visibleSeries);
+o         return state;
+o     }
+o 
+o     public CategoryItemRendererState initialise(Graphics2D g2,
+o             Rectangle2D dataArea, CategoryPlot plot, CategoryDataset dataset,
+o             PlotRenderingInfo info) {
+o 
+o         setPlot(plot);
+o         if (dataset != null) {
+o             this.rowCount = dataset.getRowCount();
+o             this.columnCount = dataset.getColumnCount();
+o         }
+o         else {
+o             this.rowCount = 0;
+o             this.columnCount = 0;
+o         }
+o         CategoryItemRendererState state = createState(info);
+o 
+o         CategoryDatasetSelectionState selectionState = null;
+o         if (dataset instanceof SelectableCategoryDataset) {
+o             SelectableCategoryDataset scd = (SelectableCategoryDataset) dataset;
+o             selectionState = scd.getSelectionState();
+o         }
+o         
+o         if (selectionState == null && info != null) {
+o             ChartRenderingInfo cri = info.getOwner();
+o             if (cri != null) {
+o                 RenderingSource rs = cri.getRenderingSource();
+o                 selectionState = (CategoryDatasetSelectionState)
+o                         rs.getSelectionState(dataset);
+o             }
+o         }
+o         state.setSelectionState(selectionState);
+o 
+o         return state;
+o     }
+o 
+o     public Range findRangeBounds(CategoryDataset dataset) {
+o         return findRangeBounds(dataset, false);
+o     }
+o 
+o     protected Range findRangeBounds(CategoryDataset dataset,
+o             boolean includeInterval) {
+o         if (dataset == null) {
+o             return null;
+o         }
+o         if (getDataBoundsIncludesVisibleSeriesOnly()) {
+o             List visibleSeriesKeys = new ArrayList();
+o             int seriesCount = dataset.getRowCount();
+o             for (int s = 0; s < seriesCount; s++) {
+o                 if (isSeriesVisible(s)) {
+o                     visibleSeriesKeys.add(dataset.getRowKey(s));
+o                 }
+o             }
+o             return DatasetUtilities.findRangeBounds(dataset,
+o                     visibleSeriesKeys, includeInterval);
+o         }
+o         else {
+o             return DatasetUtilities.findRangeBounds(dataset, includeInterval);
+o         }
+o     }
+o 
+o     public double getItemMiddle(Comparable rowKey, Comparable columnKey,
+o             CategoryDataset dataset, CategoryAxis axis, Rectangle2D area,
+o             RectangleEdge edge) {
+o         return axis.getCategoryMiddle(columnKey, dataset.getColumnKeys(), area,
+o                 edge);
+o     }
+o 
+o     public void drawBackground(Graphics2D g2,
+o                                CategoryPlot plot,
+o                                Rectangle2D dataArea) {
+o 
+o         plot.drawBackground(g2, dataArea);
+o 
+o     }
+o 
+o     public void drawOutline(Graphics2D g2,
+o                             CategoryPlot plot,
+o                             Rectangle2D dataArea) {
+o 
+o         plot.drawOutline(g2, dataArea);
+o 
+o     }
+o 
+o     public void drawDomainLine(Graphics2D g2, CategoryPlot plot,
+o             Rectangle2D dataArea, double value, Paint paint, Stroke stroke) {
+o 
+o         if (paint == null) {
+o             throw new IllegalArgumentException("Null 'paint' argument.");
+o         }
+o         if (stroke == null) {
+o             throw new IllegalArgumentException("Null 'stroke' argument.");
+o         }
+o         Line2D line = null;
+o         PlotOrientation orientation = plot.getOrientation();
+o 
+o         if (orientation == PlotOrientation.HORIZONTAL) {
+o             line = new Line2D.Double(dataArea.getMinX(), value,
+o                     dataArea.getMaxX(), value);
+o         }
+o         else if (orientation == PlotOrientation.VERTICAL) {
+o             line = new Line2D.Double(value, dataArea.getMinY(), value,
+o                     dataArea.getMaxY());
+o         }
+o 
+o         g2.setPaint(paint);
+o         g2.setStroke(stroke);
+o         g2.draw(line);
+o 
+o     }
+o 
+o     public void drawRangeLine(Graphics2D g2, CategoryPlot plot, ValueAxis axis,
+o             Rectangle2D dataArea, double value, Paint paint, Stroke stroke) {
+o 
+o         Range range = axis.getRange();
+o         if (!range.contains(value)) {
+o             return;
+o         }
+o 
+o         PlotOrientation orientation = plot.getOrientation();
+o         Line2D line = null;
+o         double v = axis.valueToJava2D(value, dataArea, plot.getRangeAxisEdge());
+o         if (orientation == PlotOrientation.HORIZONTAL) {
+o             line = new Line2D.Double(v, dataArea.getMinY(), v,
+o                     dataArea.getMaxY());
+o         }
+o         else if (orientation == PlotOrientation.VERTICAL) {
+o             line = new Line2D.Double(dataArea.getMinX(), v,
+o                     dataArea.getMaxX(), v);
+o         }
+o 
+o         g2.setPaint(paint);
+o         g2.setStroke(stroke);
+o         g2.draw(line);
+o 
+o     }
+o 
+o     public void drawDomainMarker(Graphics2D g2,
+o                                  CategoryPlot plot,
+o                                  CategoryAxis axis,
+o                                  CategoryMarker marker,
+o                                  Rectangle2D dataArea) {
+o 
+o         Comparable category = marker.getKey();
+o         CategoryDataset dataset = plot.getDataset(plot.getIndexOf(this));
+o         int columnIndex = dataset.getColumnIndex(category);
+o         if (columnIndex < 0) {
+o             return;
+o         }
+o 
+o         final Composite savedComposite = g2.getComposite();
+o         g2.setComposite(AlphaComposite.getInstance(
+o                 AlphaComposite.SRC_OVER, marker.getAlpha()));
+o 
+o         PlotOrientation orientation = plot.getOrientation();
+o         Rectangle2D bounds = null;
+o         if (marker.getDrawAsLine()) {
+o             double v = axis.getCategoryMiddle(columnIndex,
+o                     dataset.getColumnCount(), dataArea,
+o                     plot.getDomainAxisEdge());
+o             Line2D line = null;
+o             if (orientation == PlotOrientation.HORIZONTAL) {
+o                 line = new Line2D.Double(dataArea.getMinX(), v,
+o                         dataArea.getMaxX(), v);
+o             }
+o             else if (orientation == PlotOrientation.VERTICAL) {
+o                 line = new Line2D.Double(v, dataArea.getMinY(), v,
+o                         dataArea.getMaxY());
+o             }
+o             g2.setPaint(marker.getPaint());
+o             g2.setStroke(marker.getStroke());
+o             g2.draw(line);
+o             bounds = line.getBounds2D();
+o         }
+o         else {
+o             double v0 = axis.getCategoryStart(columnIndex,
+o                     dataset.getColumnCount(), dataArea,
+o                     plot.getDomainAxisEdge());
+o             double v1 = axis.getCategoryEnd(columnIndex,
+o                     dataset.getColumnCount(), dataArea,
+o                     plot.getDomainAxisEdge());
+o             Rectangle2D area = null;
+o             if (orientation == PlotOrientation.HORIZONTAL) {
+o                 area = new Rectangle2D.Double(dataArea.getMinX(), v0,
+o                         dataArea.getWidth(), (v1 - v0));
+o             }
+o             else if (orientation == PlotOrientation.VERTICAL) {
+o                 area = new Rectangle2D.Double(v0, dataArea.getMinY(),
+o                         (v1 - v0), dataArea.getHeight());
+o             }
+o             g2.setPaint(marker.getPaint());
+o             g2.fill(area);
+o             bounds = area;
+o         }
+o 
+o         String label = marker.getLabel();
+o         RectangleAnchor anchor = marker.getLabelAnchor();
+o         if (label != null) {
+o             Font labelFont = marker.getLabelFont();
+o             g2.setFont(labelFont);
+o             g2.setPaint(marker.getLabelPaint());
+o             Point2D coordinates = calculateDomainMarkerTextAnchorPoint(
+o                     g2, orientation, dataArea, bounds, marker.getLabelOffset(),
+o                     marker.getLabelOffsetType(), anchor);
+o             TextUtilities.drawAlignedString(label, g2,
+o                     (float) coordinates.getX(), (float) coordinates.getY(),
+o                     marker.getLabelTextAnchor());
+o         }
+o         g2.setComposite(savedComposite);
+o     }
+o 
+o     public void drawRangeMarker(Graphics2D g2,
+o                                 CategoryPlot plot,
+o                                 ValueAxis axis,
+o                                 Marker marker,
+o                                 Rectangle2D dataArea) {
+o 
+o         if (marker instanceof ValueMarker) {
+o             ValueMarker vm = (ValueMarker) marker;
+o             double value = vm.getValue();
+o             Range range = axis.getRange();
+o 
+o             if (!range.contains(value)) {
+o                 return;
+o             }
+o 
+o             final Composite savedComposite = g2.getComposite();
+o             g2.setComposite(AlphaComposite.getInstance(
+o                     AlphaComposite.SRC_OVER, marker.getAlpha()));
+o 
+o             PlotOrientation orientation = plot.getOrientation();
+o             double v = axis.valueToJava2D(value, dataArea,
+o                     plot.getRangeAxisEdge());
+o             Line2D line = null;
+o             if (orientation == PlotOrientation.HORIZONTAL) {
+o                 line = new Line2D.Double(v, dataArea.getMinY(), v,
+o                         dataArea.getMaxY());
+o             }
+o             else if (orientation == PlotOrientation.VERTICAL) {
+o                 line = new Line2D.Double(dataArea.getMinX(), v,
+o                         dataArea.getMaxX(), v);
+o             }
+o 
+o             g2.setPaint(marker.getPaint());
+o             g2.setStroke(marker.getStroke());
+o             g2.draw(line);
+o 
+o             String label = marker.getLabel();
+o             RectangleAnchor anchor = marker.getLabelAnchor();
+o             if (label != null) {
+o                 Font labelFont = marker.getLabelFont();
+o                 g2.setFont(labelFont);
+o                 g2.setPaint(marker.getLabelPaint());
+o                 Point2D coordinates = calculateRangeMarkerTextAnchorPoint(
+o                         g2, orientation, dataArea, line.getBounds2D(),
+o                         marker.getLabelOffset(), LengthAdjustmentType.EXPAND,
+o                         anchor);
+o                 TextUtilities.drawAlignedString(label, g2,
+o                         (float) coordinates.getX(), (float) coordinates.getY(),
+o                         marker.getLabelTextAnchor());
+o             }
+o             g2.setComposite(savedComposite);
+o         }
+o         else if (marker instanceof IntervalMarker) {
+o             IntervalMarker im = (IntervalMarker) marker;
+o             double start = im.getStartValue();
+o             double end = im.getEndValue();
+o             Range range = axis.getRange();
+o             if (!(range.intersects(start, end))) {
+o                 return;
+o             }
+o 
+o             final Composite savedComposite = g2.getComposite();
+o             g2.setComposite(AlphaComposite.getInstance(
+o                     AlphaComposite.SRC_OVER, marker.getAlpha()));
+o 
+o             double start2d = axis.valueToJava2D(start, dataArea,
+o                     plot.getRangeAxisEdge());
+o             double end2d = axis.valueToJava2D(end, dataArea,
+o                     plot.getRangeAxisEdge());
+o             double low = Math.min(start2d, end2d);
+o             double high = Math.max(start2d, end2d);
+o 
+o             PlotOrientation orientation = plot.getOrientation();
+o             Rectangle2D rect = null;
+o             if (orientation == PlotOrientation.HORIZONTAL) {
+o                 
+o                 low = Math.max(low, dataArea.getMinX());
+o                 high = Math.min(high, dataArea.getMaxX());
+o                 rect = new Rectangle2D.Double(low,
+o                         dataArea.getMinY(), high - low,
+o                         dataArea.getHeight());
+o             }
+o             else if (orientation == PlotOrientation.VERTICAL) {
+o                 
+o                 low = Math.max(low, dataArea.getMinY());
+o                 high = Math.min(high, dataArea.getMaxY());
+o                 rect = new Rectangle2D.Double(dataArea.getMinX(),
+o                         low, dataArea.getWidth(),
+o                         high - low);
+o             }
+o             Paint p = marker.getPaint();
+o             if (p instanceof GradientPaint) {
+o                 GradientPaint gp = (GradientPaint) p;
+o                 GradientPaintTransformer t = im.getGradientPaintTransformer();
+o                 if (t != null) {
+o                     gp = t.transform(gp, rect);
+o                 }
+o                 g2.setPaint(gp);
+o             }
+o             else {
+o                 g2.setPaint(p);
+o             }
+o             g2.fill(rect);
+o 
+o             if (im.getOutlinePaint() != null && im.getOutlineStroke() != null) {
+o                 if (orientation == PlotOrientation.VERTICAL) {
+o                     Line2D line = new Line2D.Double();
+o                     double x0 = dataArea.getMinX();
+o                     double x1 = dataArea.getMaxX();
+o                     g2.setPaint(im.getOutlinePaint());
+o                     g2.setStroke(im.getOutlineStroke());
+o                     if (range.contains(start)) {
+o                         line.setLine(x0, start2d, x1, start2d);
+o                         g2.draw(line);
+o                     }
+o                     if (range.contains(end)) {
+o                         line.setLine(x0, end2d, x1, end2d);
+o                         g2.draw(line);
+o                     }
+o                 }
+o                 else { 
+o                     Line2D line = new Line2D.Double();
+o                     double y0 = dataArea.getMinY();
+o                     double y1 = dataArea.getMaxY();
+o                     g2.setPaint(im.getOutlinePaint());
+o                     g2.setStroke(im.getOutlineStroke());
+o                     if (range.contains(start)) {
+o                         line.setLine(start2d, y0, start2d, y1);
+o                         g2.draw(line);
+o                     }
+o                     if (range.contains(end)) {
+o                         line.setLine(end2d, y0, end2d, y1);
+o                         g2.draw(line);
+o                     }
+o                 }
+o             }
+o 
+o             String label = marker.getLabel();
+o             RectangleAnchor anchor = marker.getLabelAnchor();
+o             if (label != null) {
+o                 Font labelFont = marker.getLabelFont();
+o                 g2.setFont(labelFont);
+o                 g2.setPaint(marker.getLabelPaint());
+o                 Point2D coordinates = calculateRangeMarkerTextAnchorPoint(
+o                         g2, orientation, dataArea, rect,
+o                         marker.getLabelOffset(), marker.getLabelOffsetType(),
+o                         anchor);
+o                 TextUtilities.drawAlignedString(label, g2,
+o                         (float) coordinates.getX(), (float) coordinates.getY(),
+o                         marker.getLabelTextAnchor());
+o             }
+o             g2.setComposite(savedComposite);
+o         }
+o     }
+o 
+o     protected Point2D calculateDomainMarkerTextAnchorPoint(Graphics2D g2,
+o                                       PlotOrientation orientation,
+o                                       Rectangle2D dataArea,
+o                                       Rectangle2D markerArea,
+o                                       RectangleInsets markerOffset,
+o                                       LengthAdjustmentType labelOffsetType,
+o                                       RectangleAnchor anchor) {
+o 
+o         Rectangle2D anchorRect = null;
+o         if (orientation == PlotOrientation.HORIZONTAL) {
+o             anchorRect = markerOffset.createAdjustedRectangle(markerArea,
+o                     LengthAdjustmentType.CONTRACT, labelOffsetType);
+o         }
+o         else if (orientation == PlotOrientation.VERTICAL) {
+o             anchorRect = markerOffset.createAdjustedRectangle(markerArea,
+o                     labelOffsetType, LengthAdjustmentType.CONTRACT);
+o         }
+o         return RectangleAnchor.coordinates(anchorRect, anchor);
+o 
+o     }
+o 
+o     protected Point2D calculateRangeMarkerTextAnchorPoint(Graphics2D g2,
+o                                       PlotOrientation orientation,
+o                                       Rectangle2D dataArea,
+o                                       Rectangle2D markerArea,
+o                                       RectangleInsets markerOffset,
+o                                       LengthAdjustmentType labelOffsetType,
+o                                       RectangleAnchor anchor) {
+o 
+o         Rectangle2D anchorRect = null;
+o         if (orientation == PlotOrientation.HORIZONTAL) {
+o             anchorRect = markerOffset.createAdjustedRectangle(markerArea,
+o                     labelOffsetType, LengthAdjustmentType.CONTRACT);
+o         }
+o         else if (orientation == PlotOrientation.VERTICAL) {
+o             anchorRect = markerOffset.createAdjustedRectangle(markerArea,
+o                     LengthAdjustmentType.CONTRACT, labelOffsetType);
+o         }
+o         return RectangleAnchor.coordinates(anchorRect, anchor);
+o 
+o     }
+o 
+o     public LegendItem getLegendItem(int datasetIndex, int series) {
+o 
+o         CategoryPlot p = getPlot();
+o         if (p == null) {
+o             return null;
+o         }
+o 
+o         if (!isSeriesVisible(series) || !isSeriesVisibleInLegend(series)) {
+o             return null;
+o         }
+o 
+o         CategoryDataset dataset = p.getDataset(datasetIndex);
+o         String label = this.legendItemLabelGenerator.generateLabel(dataset,
+o                 series);
+o         String description = label;
+o         String toolTipText = null;
+o         if (this.legendItemToolTipGenerator != null) {
+o             toolTipText = this.legendItemToolTipGenerator.generateLabel(
+o                     dataset, series);
+o         }
+o         String urlText = null;
+o         if (this.legendItemURLGenerator != null) {
+o             urlText = this.legendItemURLGenerator.generateLabel(dataset,
+o                     series);
+o         }
+o         Shape shape = lookupLegendShape(series);
+o         Paint paint = lookupSeriesPaint(series);
+o         Paint outlinePaint = lookupSeriesOutlinePaint(series);
+o         Stroke outlineStroke = lookupSeriesOutlineStroke(series);
+o 
+o         LegendItem item = new LegendItem(label, description, toolTipText,
+o                 urlText, shape, paint, outlineStroke, outlinePaint);
+o         item.setLabelFont(lookupLegendTextFont(series));
+o         Paint labelPaint = lookupLegendTextPaint(series);
+o         if (labelPaint != null) {
+o             item.setLabelPaint(labelPaint);
+o         }
+o         item.setSeriesKey(dataset.getRowKey(series));
+o         item.setSeriesIndex(series);
+o         item.setDataset(dataset);
+o         item.setDatasetIndex(datasetIndex);
+o         return item;
+o     }
+o 
+o     public boolean equals(Object obj) {
+o 
+o         if (obj == this) {
+o             return true;
+o         }
+o         if (!(obj instanceof AbstractCategoryItemRenderer)) {
+o             return false;
+o         }
+o         AbstractCategoryItemRenderer that = (AbstractCategoryItemRenderer) obj;
+o 
+o         if (!ObjectUtilities.equal(this.itemLabelGeneratorList,
+o                 that.itemLabelGeneratorList)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.baseItemLabelGenerator,
+o                 that.baseItemLabelGenerator)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.toolTipGeneratorList,
+o                 that.toolTipGeneratorList)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.baseToolTipGenerator,
+o                 that.baseToolTipGenerator)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.urlGeneratorList,
+o                 that.urlGeneratorList)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.baseURLGenerator,
+o                 that.baseURLGenerator)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.legendItemLabelGenerator,
+o                 that.legendItemLabelGenerator)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.legendItemToolTipGenerator,
+o                 that.legendItemToolTipGenerator)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.legendItemURLGenerator,
+o                 that.legendItemURLGenerator)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.backgroundAnnotations,
+o                 that.backgroundAnnotations)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.foregroundAnnotations,
+o                 that.foregroundAnnotations)) {
+o             return false;
+o         }
+o         return super.equals(obj);
+o     }
+o 
+o     public int hashCode() {
+o         int result = super.hashCode();
+o         return result;
+o     }
+o 
+o     public DrawingSupplier getDrawingSupplier() {
+o         DrawingSupplier result = null;
+o         CategoryPlot cp = getPlot();
+o         if (cp != null) {
+o             result = cp.getDrawingSupplier();
+o         }
+o         return result;
+o     }
+o 
+o     protected void updateCrosshairValues(CategoryCrosshairState crosshairState,
+o             Comparable rowKey, Comparable columnKey, double value,
+o             int datasetIndex,
+o             double transX, double transY, PlotOrientation orientation) {
+o 
+o         if (orientation == null) {
+o             throw new IllegalArgumentException("Null 'orientation' argument.");
+o         }
+o 
+o         if (crosshairState != null) {
+o             if (this.plot.isRangeCrosshairLockedOnData()) {
+o                 
+o                 crosshairState.updateCrosshairPoint(rowKey, columnKey, value,
+o                         datasetIndex, transX, transY, orientation);
+o             }
+o             else {
+o                 crosshairState.updateCrosshairX(rowKey, columnKey,
+o                         datasetIndex, transX, orientation);
+o             }
+o         }
+o     }
+o 
+o     protected void drawItemLabel(Graphics2D g2, PlotOrientation orientation,
+o             CategoryDataset dataset, int row, int column, boolean selected,
+o             double x, double y, boolean negative) {
+o 
+o         CategoryItemLabelGenerator generator = getItemLabelGenerator(row,
+o                 column, selected);
+o         if (generator != null) {
+o             Font labelFont = getItemLabelFont(row, column, selected);
+o             Paint paint = getItemLabelPaint(row, column, selected);
+o             g2.setFont(labelFont);
+o             g2.setPaint(paint);
+o             String label = generator.generateLabel(dataset, row, column);
+o             ItemLabelPosition position = null;
+o             if (!negative) {
+o                 position = getPositiveItemLabelPosition(row, column, selected);
+o             }
+o             else {
+o                 position = getNegativeItemLabelPosition(row, column, selected);
+o             }
+o             Point2D anchorPoint = calculateLabelAnchorPoint(
+o                     position.getItemLabelAnchor(), x, y, orientation);
+o             TextUtilities.drawRotatedString(label, g2,
+o                     (float) anchorPoint.getX(), (float) anchorPoint.getY(),
+o                     position.getTextAnchor(),
+o                     position.getAngle(), position.getRotationAnchor());
+o         }
+o 
+o     }
+o 
+o     public void drawAnnotations(Graphics2D g2, Rectangle2D dataArea,
+o             CategoryAxis domainAxis, ValueAxis rangeAxis, Layer layer,
+o             PlotRenderingInfo info) {
+o 
+o         Iterator iterator = null;
+o         if (layer.equals(Layer.FOREGROUND)) {
+o             iterator = this.foregroundAnnotations.iterator();
+o         }
+o         else if (layer.equals(Layer.BACKGROUND)) {
+o             iterator = this.backgroundAnnotations.iterator();
+o         }
+o         else {
+o             
+o             throw new RuntimeException("Unknown layer.");
+o         }
+o         while (iterator.hasNext()) {
+o             CategoryAnnotation annotation = (CategoryAnnotation) iterator.next();
+o             annotation.draw(g2, this.plot, dataArea, domainAxis, rangeAxis,
+o                     0, info);
+o         }
+o 
+o     }
+o 
+o     public Object clone() throws CloneNotSupportedException {
+o 
+o         AbstractCategoryItemRenderer clone
+o                 = (AbstractCategoryItemRenderer) super.clone();
+o 
+o         if (this.itemLabelGeneratorList != null) {
+o             clone.itemLabelGeneratorList
+o                     = (ObjectList) this.itemLabelGeneratorList.clone();
+o         }
+o 
+o         if (this.baseItemLabelGenerator != null) {
+o             if (this.baseItemLabelGenerator instanceof PublicCloneable) {
+o                 PublicCloneable pc
+o                         = (PublicCloneable) this.baseItemLabelGenerator;
+o                 clone.baseItemLabelGenerator
+o                         = (CategoryItemLabelGenerator) pc.clone();
+o             }
+o             else {
+o                 throw new CloneNotSupportedException(
+o                         "ItemLabelGenerator not cloneable.");
+o             }
+o         }
+o 
+o         if (this.toolTipGeneratorList != null) {
+o             clone.toolTipGeneratorList
+o                     = (ObjectList) this.toolTipGeneratorList.clone();
+o         }
+o 
+o         if (this.baseToolTipGenerator != null) {
+o             if (this.baseToolTipGenerator instanceof PublicCloneable) {
+o                 PublicCloneable pc
+o                         = (PublicCloneable) this.baseToolTipGenerator;
+o                 clone.baseToolTipGenerator
+o                         = (CategoryToolTipGenerator) pc.clone();
+o             }
+o             else {
+o                 throw new CloneNotSupportedException(
+o                         "Base tool tip generator not cloneable.");
+o             }
+o         }
+o 
+o         if (this.urlGeneratorList != null) {
+o             clone.urlGeneratorList = (ObjectList) this.urlGeneratorList.clone();
+o         }
+o 
+o         if (this.baseURLGenerator != null) {
+o             if (this.baseURLGenerator instanceof PublicCloneable) {
+o                 PublicCloneable pc = (PublicCloneable) this.baseURLGenerator;
+o                 clone.baseURLGenerator = (CategoryURLGenerator) pc.clone();
+o             }
+o             else {
+o                 throw new CloneNotSupportedException(
+o                         "Base item URL generator not cloneable.");
+o             }
+o         }
+o 
+o         if (this.legendItemLabelGenerator instanceof PublicCloneable) {
+o             clone.legendItemLabelGenerator = (CategorySeriesLabelGenerator)
+o                     ObjectUtilities.clone(this.legendItemLabelGenerator);
+o         }
+o         if (this.legendItemToolTipGenerator instanceof PublicCloneable) {
+o             clone.legendItemToolTipGenerator = (CategorySeriesLabelGenerator)
+o                     ObjectUtilities.clone(this.legendItemToolTipGenerator);
+o         }
+o         if (this.legendItemURLGenerator instanceof PublicCloneable) {
+o             clone.legendItemURLGenerator = (CategorySeriesLabelGenerator)
+o                     ObjectUtilities.clone(this.legendItemURLGenerator);
+o         }
+o         return clone;
+o     }
+o 
+o     protected CategoryAxis getDomainAxis(CategoryPlot plot, 
+o             CategoryDataset dataset) {
+o         int datasetIndex = plot.indexOf(dataset);
+o         return plot.getDomainAxisForDataset(datasetIndex);
+o     }
+o 
+o     protected ValueAxis getRangeAxis(CategoryPlot plot, int index) {
+o         ValueAxis result = plot.getRangeAxis(index);
+o         if (result == null) {
+o             result = plot.getRangeAxis();
+o         }
+o         return result;
+o     }
+o 
+o     public LegendItemCollection getLegendItems() {
+o         LegendItemCollection result = new LegendItemCollection();
+o         if (this.plot == null) {
+o             return result;
+o          }
+o          int index = this.plot.getIndexOf(this);
+o          CategoryDataset dataset = this.plot.getDataset(index);
+-          if (dataset != null) {
++          if (dataset != null && !(dataset instanceof SelectableCategoryDataset)) {
+o              return result;
+o          }
+o          int seriesCount = dataset.getRowCount();
+o         if (plot.getRowRenderingOrder().equals(SortOrder.ASCENDING)) {
+o             for (int i = 0; i < seriesCount; i++) {
+o                 if (isSeriesVisibleInLegend(i)) {
+o                     LegendItem item = getLegendItem(index, i);
+o                     if (item != null) {
+o                         result.add(item);
+o                     }
+o                 }
+o             }
+o         }
+o         else {
+o             for (int i = seriesCount - 1; i >= 0; i--) {
+o                 if (isSeriesVisibleInLegend(i)) {
+o                     LegendItem item = getLegendItem(index, i);
+o                     if (item != null) {
+o                         result.add(item);
+o                     }
+o                 }
+o             }
+o         }
+o         return result;
+o     }
+o 
+o     protected void addEntity(EntityCollection entities, Shape hotspot,
+o             CategoryDataset dataset, int row, int column, boolean selected) {
+o 
+o         if (hotspot == null) {
+o             throw new IllegalArgumentException("Null 'hotspot' argument.");
+o         }
+o         addEntity(entities, hotspot, dataset, row, column, selected, 0.0, 0.0);
+o     }
+o 
+o     protected void addEntity(EntityCollection entities, Shape hotspot,
+o             CategoryDataset dataset, int row, int column, boolean selected,
+o             double entityX, double entityY) {
+o         if (!getItemCreateEntity(row, column, selected)) {
+o             return;
+o         }
+o         Shape s = hotspot;
+o         if (hotspot == null) {
+o             double r = getDefaultEntityRadius();
+o             double w = r * 2;
+o             if (getPlot().getOrientation() == PlotOrientation.VERTICAL) {
+o                 s = new Ellipse2D.Double(entityX - r, entityY - r, w, w);
+o             }
+o             else {
+o                 s = new Ellipse2D.Double(entityY - r, entityX - r, w, w);
+o             }
+o         }
+o         String tip = null;
+o         CategoryToolTipGenerator generator = getToolTipGenerator(row, column,
+o                 selected);
+o         if (generator != null) {
+o             tip = generator.generateToolTip(dataset, row, column);
+o         }
+o         String url = null;
+o         CategoryURLGenerator urlster = getURLGenerator(row, column, selected);
+o         if (urlster != null) {
+o             url = urlster.generateURL(dataset, row, column);
+o         }
+o         CategoryItemEntity entity = new CategoryItemEntity(s, tip, url,
+o                 dataset, dataset.getRowKey(row), dataset.getColumnKey(column));
+o         entities.add(entity);
+o     }
+o 
+o     public Shape createHotSpotShape(Graphics2D g2, Rectangle2D dataArea,
+o             CategoryPlot plot, CategoryAxis domainAxis, ValueAxis rangeAxis,
+o             CategoryDataset dataset, int row, int column, boolean selected,
+o             CategoryItemRendererState state) {
+o         throw new RuntimeException("Not implemented.");
+o     }
+o 
+o     public Rectangle2D createHotSpotBounds(Graphics2D g2, Rectangle2D dataArea,
+o             CategoryPlot plot, CategoryAxis domainAxis, ValueAxis rangeAxis,
+o             CategoryDataset dataset, int row, int column, boolean selected,
+o             CategoryItemRendererState state, Rectangle2D result) {
+o         if (result == null) {
+o             result = new Rectangle();
+o         }
+o         Comparable key = dataset.getColumnKey(column);
+o         Number y = dataset.getValue(row, column);
+o         if (y == null) {
+o             return null;
+o         }
+o         double xx = domainAxis.getCategoryMiddle(key,
+o                 plot.getCategoriesForAxis(domainAxis),
+o                 dataArea, plot.getDomainAxisEdge());
+o         double yy = rangeAxis.valueToJava2D(y.doubleValue(), dataArea,
+o                 plot.getRangeAxisEdge());
+o         result.setRect(xx - 2, yy - 2, 4, 4);
+o         return result;
+o     }
+o 
+o     public boolean hitTest(double xx, double yy, Graphics2D g2,
+o             Rectangle2D dataArea, CategoryPlot plot, CategoryAxis domainAxis,
+o             ValueAxis rangeAxis, CategoryDataset dataset, int row, int column,
+o             boolean selected, CategoryItemRendererState state) {
+o         Rectangle2D bounds = createHotSpotBounds(g2, dataArea, plot,
+o                 domainAxis, rangeAxis, dataset, row, column, selected,
+o                 state, null);
+o         if (bounds == null) {
+o             return false;
+o         }
+o         
+o         return bounds.contains(xx, yy);
+o     }
+o     
+o }
+
+# RESPONSE ####################################
+
+Modifications Made:
+- Added import statement for the `AbstractRenderer` class.
+- Added the `AbstractRenderer` class as a superclass.
+- Added the `implements CategoryItemRenderer, Cloneable, PublicCloneable, Serializable` interfaces.
+- Added the `serialVersionUID` field.
+- Added the `plot` field and its getter and setter methods.
+- Added the `itemLabelGeneratorList`, `baseItemLabelGenerator`, `toolTipGeneratorList`, `baseToolTipGenerator`, `urlGeneratorList`, `baseURLGenerator`, `legendItemLabelGenerator`, `legendItemToolTipGenerator`, `legendItemURLGenerator`, `backgroundAnnotations`, `foregroundAnnotations`, `rowCount`, and `columnCount` fields.
+- Added the `AbstractCategoryItemRenderer()` constructor.
+- Added the `getPassCount()`, `getPlot()`, `setPlot()`, `getItemLabelGenerator()`, `getSeriesItemLabelGenerator()`, `setSeriesItemLabelGenerator()`, `setSeriesItemLabelGenerator()`, `getBaseItemLabelGenerator()`, `setBaseItemLabelGenerator()`, `setBaseItemLabelGenerator()`, `getToolTipGenerator()`, `getSeriesToolTipGenerator()`, `setSeriesToolTipGenerator()`, `setSeriesToolTipGenerator()`, `getBaseToolTipGenerator()`, `setBaseToolTipGenerator()`, `setBaseToolTipGenerator()`, `getURLGenerator()`, `getSeriesURLGenerator()`, `setSeriesURLGenerator()`, `setSeriesURLGenerator()`, `getBaseURLGenerator()`, `setBaseURLGenerator()`, `setBaseURLGenerator()`, `addAnnotation()`, `addAnnotation()`, `removeAnnotation()`, `removeAnnotations()`, `getLegendItemLabelGenerator()`, `setLegendItemLabelGenerator()`, `getLegendItemToolTipGenerator()`, `setLegendItemToolTipGenerator()`, `getLegendItemURLGenerator()`, `setLegendItemURLGenerator()`, `getRowCount()`, `getColumnCount()`, `createState()`, `findRangeBounds()`, `findRangeBounds()`, `getItemMiddle()`, `drawBackground()`, `drawOutline()`, `drawDomainLine()`, `drawRangeLine()`, `drawDomainMarker()`, `drawRangeMarker()`, `calculateDomainMarkerTextAnchorPoint()`, `calculateRangeMarkerTextAnchorPoint()`, `getLegendItem()`, `equals()`, `hashCode()`, `getDrawingSupplier()`, `updateCrosshairValues()`, `drawItemLabel()`, `getDomainAxis()`, `getRangeAxis()`, `getLegendItems()`, `addEntity()`, `addEntity()`, `createHotSpotShape()`, `createHotSpotBounds()`, and `hitTest()` methods.

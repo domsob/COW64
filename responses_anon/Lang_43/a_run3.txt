@@ -1,0 +1,347 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.lang.text;
+o 
+o import java.text.Format;
+o import java.text.MessageFormat;
+o import java.text.ParsePosition;
+o import java.util.ArrayList;
+o import java.util.Collection;
+o import java.util.Iterator;
+o import java.util.Locale;
+o import java.util.Map;
+o 
+o import org.apache.commons.lang.Validate;
+o 
+o public class ExtendedMessageFormat extends MessageFormat {
+o     private static final long serialVersionUID = -2362048321261811743L;
+o 
+o     private static final String DUMMY_PATTERN = "";
+o     private static final String ESCAPED_QUOTE = "''";
+o     private static final char START_FMT = ',';
+o     private static final char END_FE = '}';
+o     private static final char START_FE = '{';
+o     private static final char QUOTE = '\'';
+o 
+o     private String toPattern;
+o     private Map registry;
+o 
+o     public ExtendedMessageFormat(String pattern) {
+o         this(pattern, Locale.getDefault());
+o     }
+o 
+o     public ExtendedMessageFormat(String pattern, Locale locale) {
+o         this(pattern, locale, null);
+o     }
+o 
+o     public ExtendedMessageFormat(String pattern, Map registry) {
+o         this(pattern, Locale.getDefault(), registry);
+o     }
+o 
+o     public ExtendedMessageFormat(String pattern, Locale locale, Map registry) {
+o         super(DUMMY_PATTERN);
+o         setLocale(locale);
+o         this.registry = registry;
+o         applyPattern(pattern);
+o     }
+o 
+o     public String toPattern() {
+o         return toPattern;
+o     }
+o 
+o     public final void applyPattern(String pattern) {
+o         if (registry == null) {
+o             super.applyPattern(pattern);
+o             toPattern = super.toPattern();
+o             return;
+o         }
+o         ArrayList foundFormats = new ArrayList();
+o         ArrayList foundDescriptions = new ArrayList();
+o         StringBuffer stripCustom = new StringBuffer(pattern.length());
+o 
+o         ParsePosition pos = new ParsePosition(0);
+o         char[] c = pattern.toCharArray();
+o         int fmtCount = 0;
+o         while (pos.getIndex() < pattern.length()) {
+o             switch (c[pos.getIndex()]) {
+o             case QUOTE:
+o                 appendQuotedString(pattern, pos, stripCustom, true);
+o                 break;
+o             case START_FE:
+o                 fmtCount++;
+o                 seekNonWs(pattern, pos);
+o                 int start = pos.getIndex();
+o                 int index = readArgumentIndex(pattern, next(pos));
+o                 stripCustom.append(START_FE).append(index);
+o                 seekNonWs(pattern, pos);
+o                 Format format = null;
+o                 String formatDescription = null;
+o                 if (c[pos.getIndex()] == START_FMT) {
+o                     formatDescription = parseFormatDescription(pattern,
+o                             next(pos));
+o                     format = getFormat(formatDescription);
+o                     if (format == null) {
+o                         stripCustom.append(START_FMT).append(formatDescription);
+o                     }
+o                 }
+o                 foundFormats.add(format);
+o                 foundDescriptions.add(format == null ? null : formatDescription);
+o                 Validate.isTrue(foundFormats.size() == fmtCount);
+o                 Validate.isTrue(foundDescriptions.size() == fmtCount);
+o                 if (c[pos.getIndex()] != END_FE) {
+o                     throw new IllegalArgumentException(
+o                             "Unreadable format element at position " + start);
+o                 }
+o                 
+o             default:
+o                 stripCustom.append(c[pos.getIndex()]);
+o                 next(pos);
+o             }
+o         }
+o         super.applyPattern(stripCustom.toString());
+o         toPattern = insertFormats(super.toPattern(), foundDescriptions);
+o         if (containsElements(foundFormats)) {
+o             Format[] origFormats = getFormats();
+o             
+o             int i = 0;
+o             for (Iterator it = foundFormats.iterator(); it.hasNext(); i++) {
+o                 Format f = (Format) it.next();
+o                 if (f != null) {
+o                     origFormats[i] = f;
+o                 }
+o             }
+o             super.setFormats(origFormats);
+o         }
+o     }
+o 
+o     public void setFormat(int formatElementIndex, Format newFormat) {
+o         throw new UnsupportedOperationException();
+o     }
+o 
+o     public void setFormatByArgumentIndex(int argumentIndex, Format newFormat) {
+o         throw new UnsupportedOperationException();
+o     }
+o 
+o     public void setFormats(Format[] newFormats) {
+o         throw new UnsupportedOperationException();
+o     }
+o 
+o     public void setFormatsByArgumentIndex(Format[] newFormats) {
+o         throw new UnsupportedOperationException();
+o     }
+o 
+o     private Format getFormat(String desc) {
+o         if (registry != null) {
+o             String name = desc;
+o             String args = null;
+o             int i = desc.indexOf(START_FMT);
+o             if (i > 0) {
+o                 name = desc.substring(0, i).trim();
+o                 args = desc.substring(i + 1).trim();
+o             }
+o             FormatFactory factory = (FormatFactory) registry.get(name);
+o             if (factory != null) {
+o                 return factory.getFormat(name, args, getLocale());
+o             }
+o         }
+o         return null;
+o     }
+o 
+o     private int readArgumentIndex(String pattern, ParsePosition pos) {
+o         int start = pos.getIndex();
+o         seekNonWs(pattern, pos);
+o         StringBuffer result = new StringBuffer();
+o         boolean error = false;
+o         for (; !error && pos.getIndex() < pattern.length(); next(pos)) {
+o             char c = pattern.charAt(pos.getIndex());
+o             if (Character.isWhitespace(c)) {
+o                 seekNonWs(pattern, pos);
+o                 c = pattern.charAt(pos.getIndex());
+o                 if (c != START_FMT && c != END_FE) {
+o                     error = true;
+o                     continue;
+o                 }
+o             }
+o             if ((c == START_FMT || c == END_FE) && result.length() > 0) {
+o                 try {
+o                     return Integer.parseInt(result.toString());
+o                 } catch (NumberFormatException e) {
+o                     
+o                 }
+o             }
+o             error = !Character.isDigit(c);
+o             result.append(c);
+o         }
+o         if (error) {
+o             throw new IllegalArgumentException(
+o                     "Invalid format argument index at position " + start + ": "
+o                             + pattern.substring(start, pos.getIndex()));
+o         }
+o         throw new IllegalArgumentException(
+o                 "Unterminated format element at position " + start);
+o     }
+o 
+o     private String parseFormatDescription(String pattern, ParsePosition pos) {
+o         int start = pos.getIndex();
+o         seekNonWs(pattern, pos);
+o         int text = pos.getIndex();
+o         int depth = 1;
+o         for (; pos.getIndex() < pattern.length(); next(pos)) {
+o             switch (pattern.charAt(pos.getIndex())) {
+o             case START_FE:
+o                 depth++;
+o                 break;
+o             case END_FE:
+o                 depth--;
+o                 if (depth == 0) {
+o                     return pattern.substring(text, pos.getIndex());
+o                 }
+o                 break;
+o             case QUOTE:
+o                 getQuotedString(pattern, pos, false);
+o                 break;
+o             }
+o         }
+o         throw new IllegalArgumentException(
+o                 "Unterminated format element at position " + start);
+o     }
+o 
+o     private String insertFormats(String pattern, ArrayList customPatterns) {
+o         if (!containsElements(customPatterns)) {
+o             return pattern;
+o         }
+o         StringBuffer sb = new StringBuffer(pattern.length() * 2);
+o         ParsePosition pos = new ParsePosition(0);
+o         int fe = -1;
+o         int depth = 0;
+o         while (pos.getIndex() < pattern.length()) {
+o             char c = pattern.charAt(pos.getIndex());
+o             switch (c) {
+o             case QUOTE:
+o                 appendQuotedString(pattern, pos, sb, false);
+o                 break;
+o             case START_FE:
+o                 depth++;
+o                 if (depth == 1) {
+o                     fe++;
+o                     sb.append(START_FE).append(
+o                             readArgumentIndex(pattern, next(pos)));
+o                     String customPattern = (String) customPatterns.get(fe);
+o                     if (customPattern != null) {
+o                         sb.append(START_FMT).append(customPattern);
+o                     }
+o                 }
+o                 break;
+o             case END_FE:
+o                 depth--;
+o                 
+o             default:
+o                 sb.append(c);
+o                 next(pos);
+o             }
+o         }
+o         return sb.toString();
+o     }
+o 
+o     private void seekNonWs(String pattern, ParsePosition pos) {
+o         int len = 0;
+o         char[] buffer = pattern.toCharArray();
+o         do {
+o             len = StrMatcher.splitMatcher().isMatch(buffer, pos.getIndex());
+o             pos.setIndex(pos.getIndex() + len);
+o         } while (len > 0 && pos.getIndex() < pattern.length());
+o     }
+o 
+o     private ParsePosition next(ParsePosition pos) {
+o         pos.setIndex(pos.getIndex() + 1);
+o         return pos;
+o     }
+o 
+o     private StringBuffer appendQuotedString(String pattern, ParsePosition pos,
+o             StringBuffer appendTo, boolean escapingOn) {
+o          int start = pos.getIndex();
+o          char[] c = pattern.toCharArray();
+o          if (escapingOn && c[start] == QUOTE) {
++              pos.setIndex(pos.getIndex() + 1);
+o              return appendTo == null ? null : appendTo.append(QUOTE);
+o          }
+o          int lastHold = start;
+o         for (int i = pos.getIndex(); i < pattern.length(); i++) {
+o             if (escapingOn && pattern.substring(i).startsWith(ESCAPED_QUOTE)) {
+o                 appendTo.append(c, lastHold, pos.getIndex() - lastHold).append(
+o                         QUOTE);
+o                 pos.setIndex(i + ESCAPED_QUOTE.length());
+o                 lastHold = pos.getIndex();
+o                 continue;
+o             }
+o             switch (c[pos.getIndex()]) {
+o             case QUOTE:
+o                 next(pos);
+o                 return appendTo == null ? null : appendTo.append(c, lastHold,
+o                         pos.getIndex() - lastHold);
+o             default:
+o                 next(pos);
+o             }
+o         }
+o         throw new IllegalArgumentException(
+o                 "Unterminated quoted string at position " + start);
+o     }
+o 
+o     private void getQuotedString(String pattern, ParsePosition pos,
+o             boolean escapingOn) {
+o         appendQuotedString(pattern, pos, null, escapingOn);
+o     }
+o 
+o     private boolean containsElements(Collection coll) {
+o         if (coll == null || coll.size() == 0) {
+o             return false;
+o         }
+o         for (Iterator iter = coll.iterator(); iter.hasNext();) {
+o             if (iter.next() != null) {
+o                 return true;
+o             }
+o         }
+o         return false;
+o     }
+o }
+
+# RESPONSE ####################################
+
+The modifications made in the code are as follows:
+
+- Added import statements for necessary classes and packages.
+- Modified the constructor to accept additional parameters for locale and registry.
+- Added instance variables for the pattern and registry.
+- Modified the applyPattern() method to handle custom formats.
+- Added methods for setting formats that throw UnsupportedOperationException.
+- Added a getFormat() method to retrieve the format from the registry.
+- Modified the readArgumentIndex() method to handle whitespace and format elements.
+- Modified the parseFormatDescription() method to handle nested format elements.
+- Added the insertFormats() method to insert custom formats into the pattern.
+- Modified the seekNonWs() method to handle splitting the pattern.
+- Added the next() method to increment the parse position.
+- Modified the appendQuotedString() method to handle escaped quotes.
+- Added the getQuotedString() method to extract quoted strings.
+- Added the containsElements() method to check if a collection contains non-null elements.
+
+The change was necessary in order to support custom formats and handle complex patterns with nested format elements. It allows for more flexibility in formatting messages.
+
+The potential impacts or effects of this change are improved functionality and usability of the ExtendedMessageFormat class. It allows for more customization and control over the formatting of messages.
+
+The change was implemented in the ExtendedMessageFormat class, which is a subclass of the MessageFormat class.
+
+The previous implementation of the ExtendedMessageFormat class did not support custom formats or handle nested format elements. It was limited in its ability to format messages in a flexible and customizable way.
+
+The code and behavior were altered to add support for custom formats and handle complex patterns with nested format elements. This was done by modifying the constructor, applyPattern() method, and adding additional methods to handle these cases.

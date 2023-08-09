@@ -1,0 +1,417 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.jfree.chart.plot;
+o 
+o import java.awt.Color;
+o import java.awt.Font;
+o import java.awt.Graphics2D;
+o import java.awt.Paint;
+o import java.awt.Rectangle;
+o import java.awt.geom.Point2D;
+o import java.awt.geom.Rectangle2D;
+o import java.io.IOException;
+o import java.io.ObjectInputStream;
+o import java.io.ObjectOutputStream;
+o import java.io.Serializable;
+o import java.util.HashMap;
+o import java.util.Iterator;
+o import java.util.List;
+o import java.util.Map;
+o 
+o import org.jfree.chart.ChartRenderingInfo;
+o import org.jfree.chart.JFreeChart;
+o import org.jfree.chart.LegendItem;
+o import org.jfree.chart.LegendItemCollection;
+o import org.jfree.chart.event.PlotChangeEvent;
+o import org.jfree.chart.title.TextTitle;
+o import org.jfree.chart.util.ObjectUtilities;
+o import org.jfree.chart.util.PaintUtilities;
+o import org.jfree.chart.util.RectangleEdge;
+o import org.jfree.chart.util.RectangleInsets;
+o import org.jfree.chart.util.SerialUtilities;
+o import org.jfree.chart.util.TableOrder;
+o import org.jfree.data.category.CategoryDataset;
+o import org.jfree.data.category.CategoryToPieDataset;
+o import org.jfree.data.general.DatasetChangeEvent;
+o import org.jfree.data.general.DatasetUtilities;
+o import org.jfree.data.general.PieDataset;
+o 
+o public class MultiplePiePlot extends Plot implements Cloneable, Serializable {
+o 
+o     private static final long serialVersionUID = -355377800470807389L;
+o 
+o     private JFreeChart pieChart;
+o 
+o     private CategoryDataset dataset;
+o 
+o     private TableOrder dataExtractOrder;
+o 
+o     private double limit = 0.0;
+o 
+o     private Comparable aggregatedItemsKey;
+o 
+o     private transient Paint aggregatedItemsPaint;
+o 
+o     private transient Map sectionPaints;
+o 
+o     public MultiplePiePlot() {
+o         this(null);
+o     }
+o 
+o     public MultiplePiePlot(CategoryDataset dataset) {
+o         super();
+o         setDataset(dataset);
+o          PiePlot piePlot = new PiePlot(null);
+o          this.pieChart = new JFreeChart(piePlot);
+o          this.pieChart.removeLegend();
++          setDataset(dataset);
+o          this.dataExtractOrder = TableOrder.BY_COLUMN;
+o          this.pieChart.setBackgroundPaint(null);
+o          TextTitle seriesTitle = new TextTitle("Series Title",
+o                 new Font("SansSerif", Font.BOLD, 12));
+o         seriesTitle.setPosition(RectangleEdge.BOTTOM);
+o         this.pieChart.setTitle(seriesTitle);
+o         this.aggregatedItemsKey = "Other";
+o         this.aggregatedItemsPaint = Color.lightGray;
+o         this.sectionPaints = new HashMap();
+o     }
+o 
+o     public CategoryDataset getDataset() {
+o         return this.dataset;
+o     }
+o 
+o     public void setDataset(CategoryDataset dataset) {
+o         
+o         if (this.dataset != null) {
+o             this.dataset.removeChangeListener(this);
+o         }
+o 
+o         this.dataset = dataset;
+o         if (dataset != null) {
+o             setDatasetGroup(dataset.getGroup());
+o             dataset.addChangeListener(this);
+o         }
+o 
+o         datasetChanged(new DatasetChangeEvent(this, dataset));
+o     }
+o 
+o     public JFreeChart getPieChart() {
+o         return this.pieChart;
+o     }
+o 
+o     public void setPieChart(JFreeChart pieChart) {
+o         if (pieChart == null) {
+o             throw new IllegalArgumentException("Null 'pieChart' argument.");
+o         }
+o         if (!(pieChart.getPlot() instanceof PiePlot)) {
+o             throw new IllegalArgumentException("The 'pieChart' argument must "
+o                     + "be a chart based on a PiePlot.");
+o         }
+o         this.pieChart = pieChart;
+o         fireChangeEvent();
+o     }
+o 
+o     public TableOrder getDataExtractOrder() {
+o         return this.dataExtractOrder;
+o     }
+o 
+o     public void setDataExtractOrder(TableOrder order) {
+o         if (order == null) {
+o             throw new IllegalArgumentException("Null 'order' argument");
+o         }
+o         this.dataExtractOrder = order;
+o         fireChangeEvent();
+o     }
+o 
+o     public double getLimit() {
+o         return this.limit;
+o     }
+o 
+o     public void setLimit(double limit) {
+o         this.limit = limit;
+o         fireChangeEvent();
+o     }
+o 
+o     public Comparable getAggregatedItemsKey() {
+o         return this.aggregatedItemsKey;
+o     }
+o 
+o     public void setAggregatedItemsKey(Comparable key) {
+o         if (key == null) {
+o             throw new IllegalArgumentException("Null 'key' argument.");
+o         }
+o         this.aggregatedItemsKey = key;
+o         fireChangeEvent();
+o     }
+o 
+o     public Paint getAggregatedItemsPaint() {
+o         return this.aggregatedItemsPaint;
+o     }
+o 
+o     public void setAggregatedItemsPaint(Paint paint) {
+o         if (paint == null) {
+o             throw new IllegalArgumentException("Null 'paint' argument.");
+o         }
+o         this.aggregatedItemsPaint = paint;
+o         fireChangeEvent();
+o     }
+o 
+o     public String getPlotType() {
+o         return "Multiple Pie Plot";
+o          
+o     }
+o 
+o     public void draw(Graphics2D g2,
+o                      Rectangle2D area,
+o                      Point2D anchor,
+o                      PlotState parentState,
+o                      PlotRenderingInfo info) {
+o 
+o         RectangleInsets insets = getInsets();
+o         insets.trim(area);
+o         drawBackground(g2, area);
+o         drawOutline(g2, area);
+o 
+o         if (DatasetUtilities.isEmptyOrNull(this.dataset)) {
+o             drawNoDataMessage(g2, area);
+o             return;
+o         }
+o 
+o         int pieCount = 0;
+o         if (this.dataExtractOrder == TableOrder.BY_ROW) {
+o             pieCount = this.dataset.getRowCount();
+o         }
+o         else {
+o             pieCount = this.dataset.getColumnCount();
+o         }
+o 
+o         int displayCols = (int) Math.ceil(Math.sqrt(pieCount));
+o         int displayRows
+o             = (int) Math.ceil((double) pieCount / (double) displayCols);
+o 
+o         if (displayCols > displayRows && area.getWidth() < area.getHeight()) {
+o             int temp = displayCols;
+o             displayCols = displayRows;
+o             displayRows = temp;
+o         }
+o 
+o         prefetchSectionPaints();
+o 
+o         int x = (int) area.getX();
+o         int y = (int) area.getY();
+o         int width = ((int) area.getWidth()) / displayCols;
+o         int height = ((int) area.getHeight()) / displayRows;
+o         int row = 0;
+o         int column = 0;
+o         int diff = (displayRows * displayCols) - pieCount;
+o         int xoffset = 0;
+o         Rectangle rect = new Rectangle();
+o 
+o         for (int pieIndex = 0; pieIndex < pieCount; pieIndex++) {
+o             rect.setBounds(x + xoffset + (width * column), y + (height * row),
+o                     width, height);
+o 
+o             String title = null;
+o             if (this.dataExtractOrder == TableOrder.BY_ROW) {
+o                 title = this.dataset.getRowKey(pieIndex).toString();
+o             }
+o             else {
+o                 title = this.dataset.getColumnKey(pieIndex).toString();
+o             }
+o             this.pieChart.setTitle(title);
+o 
+o             PieDataset piedataset = null;
+o             PieDataset dd = new CategoryToPieDataset(this.dataset,
+o                     this.dataExtractOrder, pieIndex);
+o             if (this.limit > 0.0) {
+o                 piedataset = DatasetUtilities.createConsolidatedPieDataset(
+o                         dd, this.aggregatedItemsKey, this.limit);
+o             }
+o             else {
+o                 piedataset = dd;
+o             }
+o             PiePlot piePlot = (PiePlot) this.pieChart.getPlot();
+o             piePlot.setDataset(piedataset);
+o             piePlot.setPieIndex(pieIndex);
+o 
+o             for (int i = 0; i < piedataset.getItemCount(); i++) {
+o                 Comparable key = piedataset.getKey(i);
+o                 Paint p;
+o                 if (key.equals(this.aggregatedItemsKey)) {
+o                     p = this.aggregatedItemsPaint;
+o                 }
+o                 else {
+o                     p = (Paint) this.sectionPaints.get(key);
+o                 }
+o                 piePlot.setSectionPaint(key, p);
+o             }
+o 
+o             ChartRenderingInfo subinfo = null;
+o             if (info != null) {
+o                 subinfo = new ChartRenderingInfo();
+o             }
+o             this.pieChart.draw(g2, rect, subinfo);
+o             if (info != null) {
+o                 info.getOwner().getEntityCollection().addAll(
+o                         subinfo.getEntityCollection());
+o                 info.addSubplotInfo(subinfo.getPlotInfo());
+o             }
+o 
+o             ++column;
+o             if (column == displayCols) {
+o                 column = 0;
+o                 ++row;
+o 
+o                 if (row == displayRows - 1 && diff != 0) {
+o                     xoffset = (diff * width) / 2;
+o                 }
+o             }
+o         }
+o 
+o     }
+o 
+o     private void prefetchSectionPaints() {
+o 
+o         PiePlot piePlot = (PiePlot) getPieChart().getPlot();
+o 
+o         if (this.dataExtractOrder == TableOrder.BY_ROW) {
+o             
+o             for (int c = 0; c < this.dataset.getColumnCount(); c++) {
+o                 Comparable key = this.dataset.getColumnKey(c);
+o                 Paint p = piePlot.getSectionPaint(key);
+o                 if (p == null) {
+o                     p = (Paint) this.sectionPaints.get(key);
+o                     if (p == null) {
+o                         p = getDrawingSupplier().getNextPaint();
+o                     }
+o                 }
+o                 this.sectionPaints.put(key, p);
+o             }
+o         }
+o         else {
+o             
+o             for (int r = 0; r < this.dataset.getRowCount(); r++) {
+o                 Comparable key = this.dataset.getRowKey(r);
+o                 Paint p = piePlot.getSectionPaint(key);
+o                 if (p == null) {
+o                     p = (Paint) this.sectionPaints.get(key);
+o                     if (p == null) {
+o                         p = getDrawingSupplier().getNextPaint();
+o                     }
+o                 }
+o                 this.sectionPaints.put(key, p);
+o             }
+o         }
+o 
+o     }
+o 
+o     public LegendItemCollection getLegendItems() {
+o 
+o         LegendItemCollection result = new LegendItemCollection();
+o 
+o         if (this.dataset != null) {
+o             List keys = null;
+o 
+o             prefetchSectionPaints();
+o             if (this.dataExtractOrder == TableOrder.BY_ROW) {
+o                 keys = this.dataset.getColumnKeys();
+o             }
+o             else if (this.dataExtractOrder == TableOrder.BY_COLUMN) {
+o                 keys = this.dataset.getRowKeys();
+o             }
+o 
+o             if (keys != null) {
+o                 int section = 0;
+o                 Iterator iterator = keys.iterator();
+o                 while (iterator.hasNext()) {
+o                     Comparable key = (Comparable) iterator.next();
+o                     String label = key.toString();
+o                     String description = label;
+o                     Paint paint = (Paint) this.sectionPaints.get(key);
+o                     LegendItem item = new LegendItem(label, description,
+o                             null, null, Plot.DEFAULT_LEGEND_ITEM_CIRCLE,
+o                             paint, Plot.DEFAULT_OUTLINE_STROKE, paint);
+o                     item.setDataset(getDataset());
+o                     result.add(item);
+o                     section++;
+o                 }
+o             }
+o             if (this.limit > 0.0) {
+o                 result.add(new LegendItem(this.aggregatedItemsKey.toString(),
+o                         this.aggregatedItemsKey.toString(), null, null,
+o                         Plot.DEFAULT_LEGEND_ITEM_CIRCLE,
+o                         this.aggregatedItemsPaint,
+o                         Plot.DEFAULT_OUTLINE_STROKE,
+o                         this.aggregatedItemsPaint));
+o             }
+o         }
+o         return result;
+o     }
+o 
+o     public boolean equals(Object obj) {
+o         if (obj == this) {
+o             return true;
+o         }
+o         if (!(obj instanceof MultiplePiePlot)) {
+o             return false;
+o         }
+o         MultiplePiePlot that = (MultiplePiePlot) obj;
+o         if (this.dataExtractOrder != that.dataExtractOrder) {
+o             return false;
+o         }
+o         if (this.limit != that.limit) {
+o             return false;
+o         }
+o         if (!this.aggregatedItemsKey.equals(that.aggregatedItemsKey)) {
+o             return false;
+o         }
+o         if (!PaintUtilities.equal(this.aggregatedItemsPaint,
+o                 that.aggregatedItemsPaint)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.pieChart, that.pieChart)) {
+o             return false;
+o         }
+o         if (!super.equals(obj)) {
+o             return false;
+o         }
+o         return true;
+o     }
+o 
+o     private void writeObject(ObjectOutputStream stream) throws IOException {
+o         stream.defaultWriteObject();
+o         SerialUtilities.writePaint(this.aggregatedItemsPaint, stream);
+o     }
+o 
+o     private void readObject(ObjectInputStream stream)
+o         throws IOException, ClassNotFoundException {
+o         stream.defaultReadObject();
+o         this.aggregatedItemsPaint = SerialUtilities.readPaint(stream);
+o         this.sectionPaints = new HashMap();
+o     }
+o 
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary to set the dataset in the constructor of the MultiplePiePlot class.
+
+Consequence: The dataset is now set in the constructor, ensuring that it is initialized when an instance of MultiplePiePlot is created.
+
+Position: The change was made in the constructor of the MultiplePiePlot class.
+
+Cause: The previous implementation did not set the dataset in the constructor, which meant that users had to manually set the dataset after creating an instance of MultiplePiePlot.
+
+Change: The code was modified to set the dataset in the constructor. This ensures that the dataset is initialized when an instance of MultiplePiePlot is created.

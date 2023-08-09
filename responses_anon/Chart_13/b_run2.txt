@@ -1,0 +1,426 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.jfree.chart.block;
+o 
+o import java.awt.Graphics2D;
+o import java.awt.geom.Rectangle2D;
+o import java.io.Serializable;
+o 
+o import org.jfree.chart.util.ObjectUtilities;
+o import org.jfree.chart.util.RectangleEdge;
+o import org.jfree.chart.util.Size2D;
+o import org.jfree.data.Range;
+o 
+o public class BorderArrangement implements Arrangement, Serializable {
+o 
+o     private static final long serialVersionUID = 506071142274883745L;
+o 
+o     private Block centerBlock;
+o 
+o     private Block topBlock;
+o 
+o     private Block bottomBlock;
+o 
+o     private Block leftBlock;
+o 
+o     private Block rightBlock;
+o 
+o     public BorderArrangement() {
+o     }
+o 
+o     public void add(Block block, Object key) {
+o 
+o         if (key == null) {
+o             this.centerBlock = block;
+o         }
+o         else {
+o             RectangleEdge edge = (RectangleEdge) key;
+o             if (edge == RectangleEdge.TOP) {
+o                 this.topBlock = block;
+o             }
+o             else if (edge == RectangleEdge.BOTTOM) {
+o                 this.bottomBlock = block;
+o             }
+o             else if (edge == RectangleEdge.LEFT) {
+o                 this.leftBlock = block;
+o             }
+o             else if (edge == RectangleEdge.RIGHT) {
+o                 this.rightBlock = block;
+o             }
+o         }
+o     }
+o 
+o     public Size2D arrange(BlockContainer container,
+o                           Graphics2D g2,
+o                           RectangleConstraint constraint) {
+o         RectangleConstraint contentConstraint
+o                 = container.toContentConstraint(constraint);
+o         Size2D contentSize = null;
+o         LengthConstraintType w = contentConstraint.getWidthConstraintType();
+o         LengthConstraintType h = contentConstraint.getHeightConstraintType();
+o         if (w == LengthConstraintType.NONE) {
+o             if (h == LengthConstraintType.NONE) {
+o                 contentSize = arrangeNN(container, g2);
+o             }
+o             else if (h == LengthConstraintType.FIXED) {
+o                 throw new RuntimeException("Not implemented.");
+o             }
+o             else if (h == LengthConstraintType.RANGE) {
+o                 throw new RuntimeException("Not implemented.");
+o             }
+o         }
+o         else if (w == LengthConstraintType.FIXED) {
+o             if (h == LengthConstraintType.NONE) {
+o                 contentSize = arrangeFN(container, g2, constraint.getWidth());
+o             }
+o             else if (h == LengthConstraintType.FIXED) {
+o                 contentSize = arrangeFF(container, g2, constraint);
+o             }
+o             else if (h == LengthConstraintType.RANGE) {
+o                 contentSize = arrangeFR(container, g2, constraint);
+o             }
+o         }
+o         else if (w == LengthConstraintType.RANGE) {
+o             if (h == LengthConstraintType.NONE) {
+o                 throw new RuntimeException("Not implemented.");
+o             }
+o             else if (h == LengthConstraintType.FIXED) {
+o                 throw new RuntimeException("Not implemented.");
+o             }
+o             else if (h == LengthConstraintType.RANGE) {
+o                 contentSize = arrangeRR(container, constraint.getWidthRange(),
+o                         constraint.getHeightRange(), g2);
+o             }
+o         }
+o         return new Size2D(container.calculateTotalWidth(contentSize.getWidth()),
+o                 container.calculateTotalHeight(contentSize.getHeight()));
+o     }
+o 
+o     protected Size2D arrangeNN(BlockContainer container, Graphics2D g2) {
+o         double[] w = new double[5];
+o         double[] h = new double[5];
+o         if (this.topBlock != null) {
+o             Size2D size = this.topBlock.arrange(g2, RectangleConstraint.NONE);
+o             w[0] = size.width;
+o             h[0] = size.height;
+o         }
+o         if (this.bottomBlock != null) {
+o             Size2D size = this.bottomBlock.arrange(g2,
+o                     RectangleConstraint.NONE);
+o             w[1] = size.width;
+o             h[1] = size.height;
+o         }
+o         if (this.leftBlock != null) {
+o             Size2D size = this.leftBlock.arrange(g2, RectangleConstraint.NONE);
+o             w[2] = size.width;
+o             h[2] = size.height;
+o        }
+o         if (this.rightBlock != null) {
+o             Size2D size = this.rightBlock.arrange(g2, RectangleConstraint.NONE);
+o             w[3] = size.width;
+o             h[3] = size.height;
+o         }
+o 
+o         h[2] = Math.max(h[2], h[3]);
+o         h[3] = h[2];
+o 
+o         if (this.centerBlock != null) {
+o             Size2D size = this.centerBlock.arrange(g2,
+o                     RectangleConstraint.NONE);
+o             w[4] = size.width;
+o             h[4] = size.height;
+o         }
+o         double width = Math.max(w[0], Math.max(w[1], w[2] + w[4] + w[3]));
+o         double centerHeight = Math.max(h[2], Math.max(h[3], h[4]));
+o         double height = h[0] + h[1] + centerHeight;
+o         if (this.topBlock != null) {
+o             this.topBlock.setBounds(new Rectangle2D.Double(0.0, 0.0, width,
+o                     h[0]));
+o         }
+o         if (this.bottomBlock != null) {
+o             this.bottomBlock.setBounds(new Rectangle2D.Double(0.0,
+o                     height - h[1], width, h[1]));
+o         }
+o         if (this.leftBlock != null) {
+o             this.leftBlock.setBounds(new Rectangle2D.Double(0.0, h[0], w[2],
+o                     centerHeight));
+o         }
+o         if (this.rightBlock != null) {
+o             this.rightBlock.setBounds(new Rectangle2D.Double(width - w[3],
+o                     h[0], w[3], centerHeight));
+o         }
+o 
+o         if (this.centerBlock != null) {
+o             this.centerBlock.setBounds(new Rectangle2D.Double(w[2], h[0],
+o                     width - w[2] - w[3], centerHeight));
+o         }
+o         return new Size2D(width, height);
+o     }
+o 
+o     protected Size2D arrangeFR(BlockContainer container, Graphics2D g2,
+o                                RectangleConstraint constraint) {
+o         Size2D size1 = arrangeFN(container, g2, constraint.getWidth());
+o         if (constraint.getHeightRange().contains(size1.getHeight())) {
+o             return size1;
+o         }
+o         else {
+o             double h = constraint.getHeightRange().constrain(size1.getHeight());
+o             RectangleConstraint c2 = constraint.toFixedHeight(h);
+o             return arrange(container, g2, c2);
+o         }
+o     }
+o 
+o     protected Size2D arrangeFN(BlockContainer container, Graphics2D g2,
+o                                double width) {
+o         double[] w = new double[5];
+o         double[] h = new double[5];
+o         RectangleConstraint c1 = new RectangleConstraint(width, null,
+o                 LengthConstraintType.FIXED, 0.0, null,
+o                 LengthConstraintType.NONE);
+o         if (this.topBlock != null) {
+o             Size2D size = this.topBlock.arrange(g2, c1);
+o             w[0] = size.width;
+o             h[0] = size.height;
+o         }
+o         if (this.bottomBlock != null) {
+o             Size2D size = this.bottomBlock.arrange(g2, c1);
+o             w[1] = size.width;
+o             h[1] = size.height;
+o         }
+o         RectangleConstraint c2 = new RectangleConstraint(0.0,
+o                 new Range(0.0, width), LengthConstraintType.RANGE,
+o                 0.0, null, LengthConstraintType.NONE);
+o         if (this.leftBlock != null) {
+o             Size2D size = this.leftBlock.arrange(g2, c2);
+o             w[2] = size.width;
+o             h[2] = size.height;
+o         }
+o         if (this.rightBlock != null) {
+o             double maxW = Math.max(width - w[2], 0.0);
+o             RectangleConstraint c3 = new RectangleConstraint(0.0,
+o                     new Range(Math.min(w[2], maxW), maxW),
+o                     LengthConstraintType.RANGE, 0.0, null,
+o                     LengthConstraintType.NONE);
+o             Size2D size = this.rightBlock.arrange(g2, c3);
+o             w[3] = size.width;
+o             h[3] = size.height;
+o         }
+o 
+o         h[2] = Math.max(h[2], h[3]);
+o         h[3] = h[2];
+o 
+o         if (this.centerBlock != null) {
+o             RectangleConstraint c4 = new RectangleConstraint(width - w[2]
+o                     - w[3], null, LengthConstraintType.FIXED, 0.0, null,
+o                     LengthConstraintType.NONE);
+o             Size2D size = this.centerBlock.arrange(g2, c4);
+o             w[4] = size.width;
+o             h[4] = size.height;
+o         }
+o         double height = h[0] + h[1] + Math.max(h[2], Math.max(h[3], h[4]));
+o         return arrange(container, g2, new RectangleConstraint(width, height));
+o     }
+o 
+o     protected Size2D arrangeRR(BlockContainer container,
+o                                Range widthRange, Range heightRange,
+o                                Graphics2D g2) {
+o         double[] w = new double[5];
+o         double[] h = new double[5];
+o         if (this.topBlock != null) {
+o             RectangleConstraint c1 = new RectangleConstraint(widthRange,
+o                     heightRange);
+o             Size2D size = this.topBlock.arrange(g2, c1);
+o             w[0] = size.width;
+o             h[0] = size.height;
+o         }
+o         if (this.bottomBlock != null) {
+o             Range heightRange2 = Range.shift(heightRange, -h[0], false);
+o             RectangleConstraint c2 = new RectangleConstraint(widthRange,
+o                     heightRange2);
+o             Size2D size = this.bottomBlock.arrange(g2, c2);
+o             w[1] = size.width;
+o             h[1] = size.height;
+o         }
+o         Range heightRange3 = Range.shift(heightRange, -(h[0] + h[1]));
+o         if (this.leftBlock != null) {
+o             RectangleConstraint c3 = new RectangleConstraint(widthRange,
+o                     heightRange3);
+o             Size2D size = this.leftBlock.arrange(g2, c3);
+o             w[2] = size.width;
+o             h[2] = size.height;
+o         }
+o         Range widthRange2 = Range.shift(widthRange, -w[2], false);
+o         if (this.rightBlock != null) {
+o             RectangleConstraint c4 = new RectangleConstraint(widthRange2,
+o                     heightRange3);
+o             Size2D size = this.rightBlock.arrange(g2, c4);
+o             w[3] = size.width;
+o             h[3] = size.height;
+o         }
+o 
+o         h[2] = Math.max(h[2], h[3]);
+o         h[3] = h[2];
+o         Range widthRange3 = Range.shift(widthRange, -(w[2] + w[3]), false);
+o         if (this.centerBlock != null) {
+o             RectangleConstraint c5 = new RectangleConstraint(widthRange3,
+o                     heightRange3);
+o             
+o             Size2D size = this.centerBlock.arrange(g2, c5);
+o             w[4] = size.width;
+o             h[4] = size.height;
+o         }
+o         double width = Math.max(w[0], Math.max(w[1], w[2] + w[4] + w[3]));
+o         double height = h[0] + h[1] + Math.max(h[2], Math.max(h[3], h[4]));
+o         if (this.topBlock != null) {
+o             this.topBlock.setBounds(new Rectangle2D.Double(0.0, 0.0, width,
+o                     h[0]));
+o         }
+o         if (this.bottomBlock != null) {
+o             this.bottomBlock.setBounds(new Rectangle2D.Double(0.0,
+o                     height - h[1], width, h[1]));
+o         }
+o         if (this.leftBlock != null) {
+o             this.leftBlock.setBounds(new Rectangle2D.Double(0.0, h[0], w[2],
+o                     h[2]));
+o         }
+o         if (this.rightBlock != null) {
+o             this.rightBlock.setBounds(new Rectangle2D.Double(width - w[3],
+o                     h[0], w[3], h[3]));
+o         }
+o 
+o         if (this.centerBlock != null) {
+o             this.centerBlock.setBounds(new Rectangle2D.Double(w[2], h[0],
+o                     width - w[2] - w[3], height - h[0] - h[1]));
+o         }
+o         return new Size2D(width, height);
+o     }
+o 
+o     protected Size2D arrangeFF(BlockContainer container, Graphics2D g2,
+o                                RectangleConstraint constraint) {
+o         double[] w = new double[5];
+o         double[] h = new double[5];
+o         w[0] = constraint.getWidth();
+o         if (this.topBlock != null) {
+o             RectangleConstraint c1 = new RectangleConstraint(w[0], null,
+o                     LengthConstraintType.FIXED, 0.0,
+o                     new Range(0.0, constraint.getHeight()),
+o                     LengthConstraintType.RANGE);
+o             Size2D size = this.topBlock.arrange(g2, c1);
+o             h[0] = size.height;
+o         }
+o         w[1] = w[0];
+o         if (this.bottomBlock != null) {
+o             RectangleConstraint c2 = new RectangleConstraint(w[0], null,
+o                     LengthConstraintType.FIXED, 0.0, new Range(0.0,
+o                     constraint.getHeight() - h[0]), LengthConstraintType.RANGE);
+o             Size2D size = this.bottomBlock.arrange(g2, c2);
+o             h[1] = size.height;
+o         }
+o         h[2] = constraint.getHeight() - h[1] - h[0];
+o         if (this.leftBlock != null) {
+o             RectangleConstraint c3 = new RectangleConstraint(0.0,
+o                     new Range(0.0, constraint.getWidth()),
+o                     LengthConstraintType.RANGE, h[2], null,
+o                     LengthConstraintType.FIXED);
+o             Size2D size = this.leftBlock.arrange(g2, c3);
+o             w[2] = size.width;
+o         }
+o          h[3] = h[2];
+o          if (this.rightBlock != null) {
+o              RectangleConstraint c4 = new RectangleConstraint(0.0,
++                      new Range(0.0, Math.max(constraint.getWidth() - w[2], 0.0)),
+-                      new Range(0.0, constraint.getWidth() - w[2]),
+o                      LengthConstraintType.RANGE, h[2], null,
+o                      LengthConstraintType.FIXED);
+o              Size2D size = this.rightBlock.arrange(g2, c4);
+o 
+o             w[3] = size.width;
+o         }
+o         h[4] = h[2];
+o         w[4] = constraint.getWidth() - w[3] - w[2];
+o         RectangleConstraint c5 = new RectangleConstraint(w[4], h[4]);
+o         if (this.centerBlock != null) {
+o             this.centerBlock.arrange(g2, c5);
+o         }
+o 
+o         if (this.topBlock != null) {
+o             this.topBlock.setBounds(new Rectangle2D.Double(0.0, 0.0, w[0],
+o                     h[0]));
+o         }
+o         if (this.bottomBlock != null) {
+o             this.bottomBlock.setBounds(new Rectangle2D.Double(0.0, h[0] + h[2],
+o                     w[1], h[1]));
+o         }
+o         if (this.leftBlock != null) {
+o             this.leftBlock.setBounds(new Rectangle2D.Double(0.0, h[0], w[2],
+o                     h[2]));
+o         }
+o         if (this.rightBlock != null) {
+o             this.rightBlock.setBounds(new Rectangle2D.Double(w[2] + w[4], h[0],
+o                     w[3], h[3]));
+o         }
+o         if (this.centerBlock != null) {
+o             this.centerBlock.setBounds(new Rectangle2D.Double(w[2], h[0], w[4],
+o                     h[4]));
+o         }
+o         return new Size2D(constraint.getWidth(), constraint.getHeight());
+o     }
+o 
+o     public void clear() {
+o         this.centerBlock = null;
+o         this.topBlock = null;
+o         this.bottomBlock = null;
+o         this.leftBlock = null;
+o         this.rightBlock = null;
+o     }
+o 
+o     public boolean equals(Object obj) {
+o         if (obj == this) {
+o             return true;
+o         }
+o         if (!(obj instanceof BorderArrangement)) {
+o             return false;
+o         }
+o         BorderArrangement that = (BorderArrangement) obj;
+o         if (!ObjectUtilities.equal(this.topBlock, that.topBlock)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.bottomBlock, that.bottomBlock)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.leftBlock, that.leftBlock)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.rightBlock, that.rightBlock)) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.centerBlock, that.centerBlock)) {
+o             return false;
+o         }
+o         return true;
+o     }
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary when arranging blocks within a BorderArrangement.
+
+Consequence: The potential impact of this change is that the blocks will be arranged correctly within the BorderArrangement.
+
+Position: The change was implemented within the arrangeNN, arrangeFR, arrangeFN, arrangeRR, and arrangeFF methods of the BorderArrangement class.
+
+Cause: The previous implementation of the arrangeNN, arrangeFR, arrangeFN, arrangeRR, and arrangeFF methods did not correctly arrange the blocks within the BorderArrangement.
+
+Change: The code within the arrangeNN, arrangeFR, arrangeFN, arrangeRR, and arrangeFF methods was modified to correctly arrange the blocks within the BorderArrangement. This includes setting the bounds of each block and calculating the width and height of the arrangement.

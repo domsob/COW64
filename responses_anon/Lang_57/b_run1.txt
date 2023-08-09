@@ -1,0 +1,178 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.lang;
+o 
+o import java.util.ArrayList;
+o import java.util.Arrays;
+o import java.util.Collections;
+o import java.util.HashMap;
+o import java.util.HashSet;
+o import java.util.List;
+o import java.util.Locale;
+o import java.util.Map;
+o import java.util.Set;
+o 
+o public class LocaleUtils {
+o 
+o     private static final List cAvailableLocaleList;
+o     
+o     private static Set cAvailableLocaleSet;
+o     
+o     private static final Map cLanguagesByCountry = Collections.synchronizedMap(new HashMap());
+o     
+o     private static final Map cCountriesByLanguage = Collections.synchronizedMap(new HashMap());
+o     static {
+o         List list = Arrays.asList(Locale.getAvailableLocales());
+o         cAvailableLocaleList = Collections.unmodifiableList(list);
+o     }
+o 
+o     public LocaleUtils() {
+o       super();
+o     }
+o 
+o     public static Locale toLocale(String str) {
+o         if (str == null) {
+o             return null;
+o         }
+o         int len = str.length();
+o         if (len != 2 && len != 5 && len < 7) {
+o             throw new IllegalArgumentException("Invalid locale format: " + str);
+o         }
+o         char ch0 = str.charAt(0);
+o         char ch1 = str.charAt(1);
+o         if (ch0 < 'a' || ch0 > 'z' || ch1 < 'a' || ch1 > 'z') {
+o             throw new IllegalArgumentException("Invalid locale format: " + str);
+o         }
+o         if (len == 2) {
+o             return new Locale(str, "");
+o         } else {
+o             if (str.charAt(2) != '_') {
+o                 throw new IllegalArgumentException("Invalid locale format: " + str);
+o             }
+o             char ch3 = str.charAt(3);
+o             char ch4 = str.charAt(4);
+o             if (ch3 < 'A' || ch3 > 'Z' || ch4 < 'A' || ch4 > 'Z') {
+o                 throw new IllegalArgumentException("Invalid locale format: " + str);
+o             }
+o             if (len == 5) {
+o                 return new Locale(str.substring(0, 2), str.substring(3, 5));
+o             } else {
+o                 if (str.charAt(5) != '_') {
+o                     throw new IllegalArgumentException("Invalid locale format: " + str);
+o                 }
+o                 return new Locale(str.substring(0, 2), str.substring(3, 5), str.substring(6));
+o             }
+o         }
+o     }
+o 
+o     public static List localeLookupList(Locale locale) {
+o         return localeLookupList(locale, locale);
+o     }
+o 
+o     public static List localeLookupList(Locale locale, Locale defaultLocale) {
+o         List list = new ArrayList(4);
+o         if (locale != null) {
+o             list.add(locale);
+o             if (locale.getVariant().length() > 0) {
+o                 list.add(new Locale(locale.getLanguage(), locale.getCountry()));
+o             }
+o             if (locale.getCountry().length() > 0) {
+o                 list.add(new Locale(locale.getLanguage(), ""));
+o             }
+o             if (list.contains(defaultLocale) == false) {
+o                 list.add(defaultLocale);
+o             }
+o         }
+o         return Collections.unmodifiableList(list);
+o     }
+o 
+o     public static List availableLocaleList() {
+o         return cAvailableLocaleList;
+o     }
+o 
+o     public static Set availableLocaleSet() {
+o         Set set = cAvailableLocaleSet;
+o         if (set == null) {
+o             set = new HashSet(availableLocaleList());
+o             set = Collections.unmodifiableSet(set);
+o             cAvailableLocaleSet = set;
+o         }
+o         return set;
+o     }
+o 
+o      public static boolean isAvailableLocale(Locale locale) {
++          if (!(cAvailableLocaleSet != null))
++  			return true;
+o          return cAvailableLocaleSet.contains(locale);
+o      }
+o  
+o     public static List languagesByCountry(String countryCode) {
+o         List langs = (List) cLanguagesByCountry.get(countryCode);  
+o         if (langs == null) {
+o             if (countryCode != null) {
+o                 langs = new ArrayList();
+o                 List locales = availableLocaleList();
+o                 for (int i = 0; i < locales.size(); i++) {
+o                     Locale locale = (Locale) locales.get(i);
+o                     if (countryCode.equals(locale.getCountry()) &&
+o                             locale.getVariant().length() == 0) {
+o                         langs.add(locale);
+o                     }
+o                 }
+o                 langs = Collections.unmodifiableList(langs);
+o             } else {
+o                 langs = Collections.EMPTY_LIST;
+o             }
+o             cLanguagesByCountry.put(countryCode, langs);  
+o         }
+o         return langs;
+o     }
+o 
+o     public static List countriesByLanguage(String languageCode) {
+o         List countries = (List) cCountriesByLanguage.get(languageCode);  
+o         if (countries == null) {
+o             if (languageCode != null) {
+o                 countries = new ArrayList();
+o                 List locales = availableLocaleList();
+o                 for (int i = 0; i < locales.size(); i++) {
+o                     Locale locale = (Locale) locales.get(i);
+o                     if (languageCode.equals(locale.getLanguage()) &&
+o                             locale.getCountry().length() != 0 &&
+o                             locale.getVariant().length() == 0) {
+o                         countries.add(locale);
+o                     }
+o                 }
+o                 countries = Collections.unmodifiableList(countries);
+o             } else {
+o                 countries = Collections.EMPTY_LIST;
+o             }
+o             cCountriesByLanguage.put(languageCode, countries);  
+o         }
+o         return countries;
+o     }
+o 
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary to improve the performance of the `availableLocaleSet` method.
+
+Consequence: The potential impact of this change is that the `availableLocaleSet` method will now return the set of available locales more efficiently.
+
+Position: The change was implemented in the `availableLocaleSet` method.
+
+Cause: The previous implementation of the `availableLocaleSet` method created a new `HashSet` by converting the available locales list every time the method was called. This process was inefficient and could result in performance issues, especially if the method was called multiple times.
+
+Change: The code now checks if the `cAvailableLocaleSet` set is null. If it is null, it creates a new `HashSet` using the `availableLocaleList` method and assigns it to `cAvailableLocaleSet`. This ensures that the set is only created once and reused for subsequent calls to the method, improving performance.

@@ -1,0 +1,207 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.math3.distribution;
+o 
+o import org.apache.commons.math3.exception.NotPositiveException;
+o import org.apache.commons.math3.exception.NotStrictlyPositiveException;
+o import org.apache.commons.math3.exception.NumberIsTooLargeException;
+o import org.apache.commons.math3.exception.util.LocalizedFormats;
+o import org.apache.commons.math3.util.FastMath;
+o import org.apache.commons.math3.random.RandomGenerator;
+o import org.apache.commons.math3.random.Well19937c;
+o 
+o public class HypergeometricDistribution extends AbstractIntegerDistribution {
+o     
+o     private static final long serialVersionUID = -436928820673516179L;
+o     
+o     private final int numberOfSuccesses;
+o     
+o     private final int populationSize;
+o     
+o     private final int sampleSize;
+o     
+o     private double numericalVariance = Double.NaN;
+o     
+o     private boolean numericalVarianceIsCalculated = false;
+o 
+o     public HypergeometricDistribution(int populationSize, int numberOfSuccesses, int sampleSize)
+o     throws NotPositiveException, NotStrictlyPositiveException, NumberIsTooLargeException {
+o         this(new Well19937c(), populationSize, numberOfSuccesses, sampleSize);
+o     }
+o 
+o     public HypergeometricDistribution(RandomGenerator rng,
+o                                       int populationSize,
+o                                       int numberOfSuccesses,
+o                                       int sampleSize)
+o     throws NotPositiveException, NotStrictlyPositiveException, NumberIsTooLargeException {
+o         super(rng);
+o 
+o         if (populationSize <= 0) {
+o             throw new NotStrictlyPositiveException(LocalizedFormats.POPULATION_SIZE,
+o                                                    populationSize);
+o         }
+o         if (numberOfSuccesses < 0) {
+o             throw new NotPositiveException(LocalizedFormats.NUMBER_OF_SUCCESSES,
+o                                            numberOfSuccesses);
+o         }
+o         if (sampleSize < 0) {
+o             throw new NotPositiveException(LocalizedFormats.NUMBER_OF_SAMPLES,
+o                                            sampleSize);
+o         }
+o 
+o         if (numberOfSuccesses > populationSize) {
+o             throw new NumberIsTooLargeException(LocalizedFormats.NUMBER_OF_SUCCESS_LARGER_THAN_POPULATION_SIZE,
+o                                                 numberOfSuccesses, populationSize, true);
+o         }
+o         if (sampleSize > populationSize) {
+o             throw new NumberIsTooLargeException(LocalizedFormats.SAMPLE_SIZE_LARGER_THAN_POPULATION_SIZE,
+o                                                 sampleSize, populationSize, true);
+o         }
+o 
+o         this.numberOfSuccesses = numberOfSuccesses;
+o         this.populationSize = populationSize;
+o         this.sampleSize = sampleSize;
+o     }
+o 
+o     public double cumulativeProbability(int x) {
+o         double ret;
+o 
+o         int[] domain = getDomain(populationSize, numberOfSuccesses, sampleSize);
+o         if (x < domain[0]) {
+o             ret = 0.0;
+o         } else if (x >= domain[1]) {
+o             ret = 1.0;
+o         } else {
+o             ret = innerCumulativeProbability(domain[0], x, 1);
+o         }
+o 
+o         return ret;
+o     }
+o 
+o     private int[] getDomain(int n, int m, int k) {
+o         return new int[] { getLowerDomain(n, m, k), getUpperDomain(m, k) };
+o     }
+o 
+o     private int getLowerDomain(int n, int m, int k) {
+o         return FastMath.max(0, m - (n - k));
+o     }
+o 
+o     public int getNumberOfSuccesses() {
+o         return numberOfSuccesses;
+o     }
+o 
+o     public int getPopulationSize() {
+o         return populationSize;
+o     }
+o 
+o     public int getSampleSize() {
+o         return sampleSize;
+o     }
+o 
+o     private int getUpperDomain(int m, int k) {
+o         return FastMath.min(k, m);
+o     }
+o 
+o     public double probability(int x) {
+o         double ret;
+o 
+o         int[] domain = getDomain(populationSize, numberOfSuccesses, sampleSize);
+o         if (x < domain[0] || x > domain[1]) {
+o             ret = 0.0;
+o         } else {
+o             double p = (double) sampleSize / (double) populationSize;
+o             double q = (double) (populationSize - sampleSize) / (double) populationSize;
+o             double p1 = SaddlePointExpansion.logBinomialProbability(x,
+o                     numberOfSuccesses, p, q);
+o             double p2 =
+o                 SaddlePointExpansion.logBinomialProbability(sampleSize - x,
+o                     populationSize - numberOfSuccesses, p, q);
+o             double p3 =
+o                 SaddlePointExpansion.logBinomialProbability(sampleSize, populationSize, p, q);
+o             ret = FastMath.exp(p1 + p2 - p3);
+o         }
+o 
+o         return ret;
+o     }
+o 
+o     public double upperCumulativeProbability(int x) {
+o         double ret;
+o 
+o         final int[] domain = getDomain(populationSize, numberOfSuccesses, sampleSize);
+o         if (x <= domain[0]) {
+o             ret = 1.0;
+o         } else if (x > domain[1]) {
+o             ret = 0.0;
+o         } else {
+o             ret = innerCumulativeProbability(domain[1], x, -1);
+o         }
+o 
+o         return ret;
+o     }
+o 
+o     private double innerCumulativeProbability(int x0, int x1, int dx) {
+o         double ret = probability(x0);
+o         while (x0 != x1) {
+o             x0 += dx;
+o             ret += probability(x0);
+o         }
+o         return ret;
+o     }
+o 
+o      public double getNumericalMean() {
++          return getSampleSize() * (getNumberOfSuccesses() / (double) getPopulationSize());
+-          return (double) (getSampleSize() * getNumberOfSuccesses()) / (double) getPopulationSize();
+o      }
+o  
+o     public double getNumericalVariance() {
+o         if (!numericalVarianceIsCalculated) {
+o             numericalVariance = calculateNumericalVariance();
+o             numericalVarianceIsCalculated = true;
+o         }
+o         return numericalVariance;
+o     }
+o 
+o     protected double calculateNumericalVariance() {
+o         final double N = getPopulationSize();
+o         final double m = getNumberOfSuccesses();
+o         final double n = getSampleSize();
+o         return (n * m * (N - n) * (N - m)) / (N * N * (N - 1));
+o     }
+o 
+o     public int getSupportLowerBound() {
+o         return FastMath.max(0,
+o                             getSampleSize() + getNumberOfSuccesses() - getPopulationSize());
+o     }
+o 
+o     public int getSupportUpperBound() {
+o         return FastMath.min(getNumberOfSuccesses(), getSampleSize());
+o     }
+o 
+o     public boolean isSupportConnected() {
+o         return true;
+o     }
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary to improve the accuracy of the calculation of the numerical mean in the HypergeometricDistribution class.
+
+Consequence: The change will potentially affect the accuracy of the numerical mean calculation in the HypergeometricDistribution class.
+
+Position: The change was implemented in the `getNumericalMean` method of the HypergeometricDistribution class.
+
+Cause: The previous implementation of the `getNumericalMean` method was using integer division, which could result in a loss of precision when dividing the number of successes by the population size.
+
+Change: The code was modified to use floating-point division instead of integer division to calculate the numerical mean. The `getNumberOfSuccesses()` method was cast to double to ensure floating-point division is used.

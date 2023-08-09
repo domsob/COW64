@@ -1,0 +1,196 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.math.util;
+o 
+o import org.apache.commons.math.exception.DimensionMismatchException;
+o import org.apache.commons.math.exception.OutOfRangeException;
+o import org.apache.commons.math.exception.NotStrictlyPositiveException;
+o import org.apache.commons.math.util.MathUtils;
+o 
+o public class MultidimensionalCounter implements Iterable<Integer> {
+o     
+o     private final int dimension;
+o     
+o     private final int[] uniCounterOffset;
+o     
+o     private final int[] size;
+o     
+o     private final int totalSize;
+o     
+o     private final int last;
+o 
+o     public class Iterator implements java.util.Iterator<Integer> {
+o         
+o         private final int[] counter = new int[dimension];
+o         
+o         private int count = -1;
+o 
+o         Iterator() {
+o             counter[last] = -1;
+o         }
+o 
+o         public boolean hasNext() {
+o             for (int i = 0; i < dimension; i++) {
+o                 if (counter[i] != size[i] - 1) {
+o                     return true;
+o                 }
+o             }
+o             return false;
+o         }
+o 
+o         public Integer next() {
+o             for (int i = last; i >= 0; i--) {
+o                 if (counter[i] == size[i] - 1) {
+o                     counter[i] = 0;
+o                 } else {
+o                     ++counter[i];
+o                     break;
+o                 }
+o             }
+o 
+o             return ++count;
+o         }
+o 
+o         public int getCount() {
+o             return count;
+o         }
+o         
+o         public int[] getCounts() {
+o             return MathUtils.copyOf(counter);
+o         }
+o 
+o         public int getCount(int dim) {
+o             return counter[dim];
+o         }
+o 
+o         public void remove() {
+o             throw new UnsupportedOperationException();
+o         }
+o     }
+o 
+o     public MultidimensionalCounter(int ... size) {
+o         dimension = size.length;
+o         this.size = MathUtils.copyOf(size);
+o 
+o         uniCounterOffset = new int[dimension];
+o 
+o         last = dimension - 1;
+o         int tS = size[last];
+o         for (int i = 0; i < last; i++) {
+o             int count = 1;
+o             for (int j = i + 1; j < dimension; j++) {
+o                 count *= size[j];
+o             }
+o             uniCounterOffset[i] = count;
+o             tS *= size[i];
+o         }
+o         uniCounterOffset[last] = 0;
+o 
+o         if (tS <= 0) {
+o             throw new NotStrictlyPositiveException(tS);
+o         }
+o 
+o         totalSize = tS;
+o     }
+o 
+o     public Iterator iterator() {
+o         return new Iterator();
+o     }
+o 
+o     public int getDimension() {
+o         return dimension;
+o     }
+o 
+o     public int[] getCounts(int index) {
+o         if (index < 0 ||
+o             index >= totalSize) {
+o             throw new OutOfRangeException(index, 0, totalSize);
+o         }
+o 
+o         final int[] indices = new int[dimension];
+o 
+o         int count = 0;
+o         for (int i = 0; i < last; i++) {
+o             int idx = 0;
+o             final int offset = uniCounterOffset[i];
+o             while (count <= index) {
+o                 count += offset;
+o                 ++idx;
+o             }
+o             --idx;
+o             count -= offset;
+o              indices[i] = idx;
+o          }
+o  
++          indices[last] = index - count;
+-          int idx = 1;
+-          while (count < index) {
+-              count += idx;
+-              ++idx;
+-          }
+-          --idx;
+-          indices[last] = idx;
+o  
+o          return indices;
+o      }
+o 
+o         }
+o         --idx;
+o         indices[last] = idx;
+o 
+o         return indices;
+o     }
+o 
+o     public int getCount(int ... c) throws OutOfRangeException {
+o         if (c.length != dimension) {
+o             throw new DimensionMismatchException(c.length, dimension);
+o         }
+o         int count = 0;
+o         for (int i = 0; i < dimension; i++) {
+o             final int index = c[i];
+o             if (index < 0 ||
+o                 index >= size[i]) {
+o                 throw new OutOfRangeException(index, 0, size[i] - 1);
+o             }
+o             count += uniCounterOffset[i] * c[i];
+o         }
+o         return count + c[last];
+o     }
+o 
+o     public int getSize() {
+o         return totalSize;
+o     }
+o     
+o     public int[] getSizes() {
+o         return MathUtils.copyOf(size);
+o     }
+o 
+o     @Override
+o     public String toString() {
+o         final StringBuilder sb = new StringBuilder();
+o         for (int i = 0; i < dimension; i++) {
+o             sb.append("[").append(getCount(i)).append("]");
+o         }
+o         return sb.toString();
+o     }
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary to improve the efficiency and readability of the code.
+Consequence: The potential impacts or effects of this change are improved performance and easier maintenance of the code.
+Position: The change was implemented in the `getCounts(int index)` method.
+Cause: The previous implementation used a while loop to calculate the value of `indices[last]` by incrementing `count` until it reached `index`. This approach was inefficient and hard to understand.
+Change: The code was modified to use a simple subtraction operation to calculate the value of `indices[last]` as `index - count`. This change improves the efficiency and readability of the code by avoiding the use of a while loop.

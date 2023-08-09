@@ -1,0 +1,421 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.math.optimization.linear;
+o 
+o import java.io.IOException;
+o import java.io.ObjectInputStream;
+o import java.io.ObjectOutputStream;
+o import java.io.Serializable;
+o import java.util.ArrayList;
+o import java.util.Collection;
+o import java.util.HashSet;
+o import java.util.List;
+o import java.util.Set;
+o 
+o import org.apache.commons.math.linear.Array2DRowRealMatrix;
+o import org.apache.commons.math.linear.MatrixUtils;
+o import org.apache.commons.math.linear.RealMatrix;
+o import org.apache.commons.math.linear.RealVector;
+o import org.apache.commons.math.optimization.GoalType;
+o import org.apache.commons.math.optimization.RealPointValuePair;
+o import org.apache.commons.math.util.Precision;
+o 
+o class SimplexTableau implements Serializable {
+o 
+o     private static final String NEGATIVE_VAR_COLUMN_LABEL = "x-";
+o 
+o     private static final int DEFAULT_ULPS = 10;
+o 
+o     private static final long serialVersionUID = -1369660067587938365L;
+o 
+o     private final LinearObjectiveFunction f;
+o 
+o     private final List<LinearConstraint> constraints;
+o 
+o     private final boolean restrictToNonNegative;
+o 
+o     private final List<String> columnLabels = new ArrayList<String>();
+o 
+o     private transient RealMatrix tableau;
+o 
+o     private final int numDecisionVariables;
+o 
+o     private final int numSlackVariables;
+o 
+o     private int numArtificialVariables;
+o 
+o     private final double epsilon;
+o 
+o     private final int maxUlps;
+o 
+o     SimplexTableau(final LinearObjectiveFunction f,
+o                    final Collection<LinearConstraint> constraints,
+o                    final GoalType goalType, final boolean restrictToNonNegative,
+o                    final double epsilon) {
+o         this(f, constraints, goalType, restrictToNonNegative, epsilon, DEFAULT_ULPS);
+o     }
+o 
+o     SimplexTableau(final LinearObjectiveFunction f,
+o                    final Collection<LinearConstraint> constraints,
+o                    final GoalType goalType, final boolean restrictToNonNegative,
+o                    final double epsilon,
+o                    final int maxUlps) {
+o         this.f                      = f;
+o         this.constraints            = normalizeConstraints(constraints);
+o         this.restrictToNonNegative  = restrictToNonNegative;
+o         this.epsilon                = epsilon;
+o         this.maxUlps                = maxUlps;
+o         this.numDecisionVariables   = f.getCoefficients().getDimension() +
+o                                       (restrictToNonNegative ? 0 : 1);
+o         this.numSlackVariables      = getConstraintTypeCounts(Relationship.LEQ) +
+o                                       getConstraintTypeCounts(Relationship.GEQ);
+o         this.numArtificialVariables = getConstraintTypeCounts(Relationship.EQ) +
+o                                       getConstraintTypeCounts(Relationship.GEQ);
+o         this.tableau = createTableau(goalType == GoalType.MAXIMIZE);
+o         initializeColumnLabels();
+o     }
+o 
+o     protected void initializeColumnLabels() {
+o       if (getNumObjectiveFunctions() == 2) {
+o         columnLabels.add("W");
+o       }
+o       columnLabels.add("Z");
+o       for (int i = 0; i < getOriginalNumDecisionVariables(); i++) {
+o         columnLabels.add("x" + i);
+o       }
+o       if (!restrictToNonNegative) {
+o         columnLabels.add(NEGATIVE_VAR_COLUMN_LABEL);
+o       }
+o       for (int i = 0; i < getNumSlackVariables(); i++) {
+o         columnLabels.add("s" + i);
+o       }
+o       for (int i = 0; i < getNumArtificialVariables(); i++) {
+o         columnLabels.add("a" + i);
+o       }
+o       columnLabels.add("RHS");
+o     }
+o 
+o     protected RealMatrix createTableau(final boolean maximize) {
+o 
+o         int width = numDecisionVariables + numSlackVariables +
+o         numArtificialVariables + getNumObjectiveFunctions() + 1; 
+o         int height = constraints.size() + getNumObjectiveFunctions();
+o         Array2DRowRealMatrix matrix = new Array2DRowRealMatrix(height, width);
+o 
+o         if (getNumObjectiveFunctions() == 2) {
+o             matrix.setEntry(0, 0, -1);
+o         }
+o         int zIndex = (getNumObjectiveFunctions() == 1) ? 0 : 1;
+o         matrix.setEntry(zIndex, zIndex, maximize ? 1 : -1);
+o         RealVector objectiveCoefficients =
+o             maximize ? f.getCoefficients().mapMultiply(-1) : f.getCoefficients();
+o         copyArray(objectiveCoefficients.toArray(), matrix.getDataRef()[zIndex]);
+o         matrix.setEntry(zIndex, width - 1,
+o             maximize ? f.getConstantTerm() : -1 * f.getConstantTerm());
+o 
+o         if (!restrictToNonNegative) {
+o             matrix.setEntry(zIndex, getSlackVariableOffset() - 1,
+o                 getInvertedCoefficientSum(objectiveCoefficients));
+o         }
+o 
+o         int slackVar = 0;
+o         int artificialVar = 0;
+o         for (int i = 0; i < constraints.size(); i++) {
+o             LinearConstraint constraint = constraints.get(i);
+o             int row = getNumObjectiveFunctions() + i;
+o 
+o             copyArray(constraint.getCoefficients().toArray(), matrix.getDataRef()[row]);
+o 
+o             if (!restrictToNonNegative) {
+o                 matrix.setEntry(row, getSlackVariableOffset() - 1,
+o                     getInvertedCoefficientSum(constraint.getCoefficients()));
+o             }
+o 
+o             matrix.setEntry(row, width - 1, constraint.getValue());
+o 
+o             if (constraint.getRelationship() == Relationship.LEQ) {
+o                 matrix.setEntry(row, getSlackVariableOffset() + slackVar++, 1);  
+o             } else if (constraint.getRelationship() == Relationship.GEQ) {
+o                 matrix.setEntry(row, getSlackVariableOffset() + slackVar++, -1); 
+o             }
+o 
+o             if ((constraint.getRelationship() == Relationship.EQ) ||
+o                     (constraint.getRelationship() == Relationship.GEQ)) {
+o                 matrix.setEntry(0, getArtificialVariableOffset() + artificialVar, 1);
+o                 matrix.setEntry(row, getArtificialVariableOffset() + artificialVar++, 1);
+o                 matrix.setRowVector(0, matrix.getRowVector(0).subtract(matrix.getRowVector(row)));
+o             }
+o         }
+o 
+o         return matrix;
+o     }
+o 
+o     public List<LinearConstraint> normalizeConstraints(Collection<LinearConstraint> originalConstraints) {
+o         List<LinearConstraint> normalized = new ArrayList<LinearConstraint>();
+o         for (LinearConstraint constraint : originalConstraints) {
+o             normalized.add(normalize(constraint));
+o         }
+o         return normalized;
+o     }
+o 
+o     private LinearConstraint normalize(final LinearConstraint constraint) {
+o         if (constraint.getValue() < 0) {
+o             return new LinearConstraint(constraint.getCoefficients().mapMultiply(-1),
+o                                         constraint.getRelationship().oppositeRelationship(),
+o                                         -1 * constraint.getValue());
+o         }
+o         return new LinearConstraint(constraint.getCoefficients(),
+o                                     constraint.getRelationship(), constraint.getValue());
+o     }
+o 
+o     protected final int getNumObjectiveFunctions() {
+o         return this.numArtificialVariables > 0 ? 2 : 1;
+o     }
+o 
+o     private int getConstraintTypeCounts(final Relationship relationship) {
+o         int count = 0;
+o         for (final LinearConstraint constraint : constraints) {
+o             if (constraint.getRelationship() == relationship) {
+o                 ++count;
+o             }
+o         }
+o         return count;
+o     }
+o 
+o     protected static double getInvertedCoefficientSum(final RealVector coefficients) {
+o         double sum = 0;
+o         for (double coefficient : coefficients.toArray()) {
+o             sum -= coefficient;
+o         }
+o         return sum;
+o     }
+o 
+o     protected Integer getBasicRow(final int col) {
+o         Integer row = null;
+o         for (int i = 0; i < getHeight(); i++) {
+o             final double entry = getEntry(i, col);
+o             if (Precision.equals(entry, 1d, maxUlps) && (row == null)) {
+o                 row = i;
+o             } else if (!Precision.equals(entry, 0d, maxUlps)) {
+o                 return null;
+o             }
+o         }
+o         return row;
+o     }
+o 
+o     protected void dropPhase1Objective() {
+o         if (getNumObjectiveFunctions() == 1) {
+o             return;
+o         }
+o 
+o         List<Integer> columnsToDrop = new ArrayList<Integer>();
+o         columnsToDrop.add(0);
+o 
+o         for (int i = getNumObjectiveFunctions(); i < getArtificialVariableOffset(); i++) {
+o             final double entry = tableau.getEntry(0, i);
+o             if (Precision.compareTo(entry, 0d, maxUlps) > 0) {
+o                 columnsToDrop.add(i);
+o             }
+o         }
+o 
+o         for (int i = 0; i < getNumArtificialVariables(); i++) {
+o           int col = i + getArtificialVariableOffset();
+o           if (getBasicRow(col) == null) {
+o             columnsToDrop.add(col);
+o           }
+o         }
+o 
+o         double[][] matrix = new double[getHeight() - 1][getWidth() - columnsToDrop.size()];
+o         for (int i = 1; i < getHeight(); i++) {
+o           int col = 0;
+o           for (int j = 0; j < getWidth(); j++) {
+o             if (!columnsToDrop.contains(j)) {
+o               matrix[i - 1][col++] = tableau.getEntry(i, j);
+o             }
+o           }
+o         }
+o 
+o         for (int i = columnsToDrop.size() - 1; i >= 0; i--) {
+o           columnLabels.remove((int) columnsToDrop.get(i));
+o         }
+o 
+o         this.tableau = new Array2DRowRealMatrix(matrix);
+o         this.numArtificialVariables = 0;
+o     }
+o 
+o     private void copyArray(final double[] src, final double[] dest) {
+o         System.arraycopy(src, 0, dest, getNumObjectiveFunctions(), src.length);
+o     }
+o 
+o     boolean isOptimal() {
+o         for (int i = getNumObjectiveFunctions(); i < getWidth() - 1; i++) {
+o             final double entry = tableau.getEntry(0, i);
+o             if (Precision.compareTo(entry, 0d, epsilon) < 0) {
+o                 return false;
+o             }
+o         }
+o         return true;
+o     }
+o 
+o     protected RealPointValuePair getSolution() {
+o       int negativeVarColumn = columnLabels.indexOf(NEGATIVE_VAR_COLUMN_LABEL);
+o       Integer negativeVarBasicRow = negativeVarColumn > 0 ? getBasicRow(negativeVarColumn) : null;
+o       double mostNegative = negativeVarBasicRow == null ? 0 : getEntry(negativeVarBasicRow, getRhsOffset());
+o 
+o       Set<Integer> basicRows = new HashSet<Integer>();
+o       double[] coefficients = new double[getOriginalNumDecisionVariables()];
+o       for (int i = 0; i < coefficients.length; i++) {
+o           int colIndex = columnLabels.indexOf("x" + i);
+o           if (colIndex < 0) {
+o             coefficients[i] = 0;
+o              continue;
+o            }
+o            Integer basicRow = getBasicRow(colIndex);
++            if (basicRow != null && basicRow == 0) {
+o                
++                coefficients[i] = 0;
++            } else if (basicRows.contains(basicRow)) {
+-            if (basicRows.contains(basicRow)) {
+o                
+o                coefficients[i] = 0 - (restrictToNonNegative ? 0 : mostNegative);
+o 
+o               coefficients[i] =
+o                   (basicRow == null ? 0 : getEntry(basicRow, getRhsOffset())) -
+o                   (restrictToNonNegative ? 0 : mostNegative);
+o           }
+o       }
+o       return new RealPointValuePair(coefficients, f.getValue(coefficients));
+o     }
+o 
+o     protected void divideRow(final int dividendRow, final double divisor) {
+o         for (int j = 0; j < getWidth(); j++) {
+o             tableau.setEntry(dividendRow, j, tableau.getEntry(dividendRow, j) / divisor);
+o         }
+o     }
+o 
+o     protected void subtractRow(final int minuendRow, final int subtrahendRow,
+o                                final double multiple) {
+o         tableau.setRowVector(minuendRow, tableau.getRowVector(minuendRow)
+o             .subtract(tableau.getRowVector(subtrahendRow).mapMultiply(multiple)));
+o     }
+o 
+o     protected final int getWidth() {
+o         return tableau.getColumnDimension();
+o     }
+o 
+o     protected final int getHeight() {
+o         return tableau.getRowDimension();
+o     }
+o 
+o     protected final double getEntry(final int row, final int column) {
+o         return tableau.getEntry(row, column);
+o     }
+o 
+o     protected final void setEntry(final int row, final int column,
+o                                   final double value) {
+o         tableau.setEntry(row, column, value);
+o     }
+o 
+o     protected final int getSlackVariableOffset() {
+o         return getNumObjectiveFunctions() + numDecisionVariables;
+o     }
+o 
+o     protected final int getArtificialVariableOffset() {
+o         return getNumObjectiveFunctions() + numDecisionVariables + numSlackVariables;
+o     }
+o 
+o     protected final int getRhsOffset() {
+o         return getWidth() - 1;
+o     }
+o 
+o     protected final int getNumDecisionVariables() {
+o         return numDecisionVariables;
+o     }
+o 
+o     protected final int getOriginalNumDecisionVariables() {
+o         return f.getCoefficients().getDimension();
+o     }
+o 
+o     protected final int getNumSlackVariables() {
+o         return numSlackVariables;
+o     }
+o 
+o     protected final int getNumArtificialVariables() {
+o         return numArtificialVariables;
+o     }
+o 
+o     protected final double[][] getData() {
+o         return tableau.getData();
+o     }
+o 
+o     @Override
+o     public boolean equals(Object other) {
+o 
+o       if (this == other) {
+o         return true;
+o       }
+o 
+o       if (other instanceof SimplexTableau) {
+o           SimplexTableau rhs = (SimplexTableau) other;
+o           return (restrictToNonNegative  == rhs.restrictToNonNegative) &&
+o                  (numDecisionVariables   == rhs.numDecisionVariables) &&
+o                  (numSlackVariables      == rhs.numSlackVariables) &&
+o                  (numArtificialVariables == rhs.numArtificialVariables) &&
+o                  (epsilon                == rhs.epsilon) &&
+o                  (maxUlps                == rhs.maxUlps) &&
+o                  f.equals(rhs.f) &&
+o                  constraints.equals(rhs.constraints) &&
+o                  tableau.equals(rhs.tableau);
+o       }
+o       return false;
+o     }
+o 
+o     @Override
+o     public int hashCode() {
+o         return Boolean.valueOf(restrictToNonNegative).hashCode() ^
+o                numDecisionVariables ^
+o                numSlackVariables ^
+o                numArtificialVariables ^
+o                Double.valueOf(epsilon).hashCode() ^
+o                maxUlps ^
+o                f.hashCode() ^
+o                constraints.hashCode() ^
+o                tableau.hashCode();
+o     }
+o 
+o     private void writeObject(ObjectOutputStream oos)
+o         throws IOException {
+o         oos.defaultWriteObject();
+o         MatrixUtils.serializeRealMatrix(tableau, oos);
+o     }
+o 
+o     private void readObject(ObjectInputStream ois)
+o       throws ClassNotFoundException, IOException {
+o         ois.defaultReadObject();
+o         MatrixUtils.deserializeRealMatrix(this, "tableau", ois);
+o     }
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary to modify the getSolution() method in the SimplexTableau class.
+
+Consequence: The change could potentially affect the calculation of the solution in the linear optimization process.
+
+Position: The change was implemented in the getSolution() method.
+
+Cause: The previous implementation of the getSolution() method did not correctly handle the case when a basic variable was repeated in different rows.
+
+Change: The code was modified to check if a basic variable is repeated in different rows and set its coefficient to 0 if it is. This ensures that the correct coefficient is used in the calculation of the solution.

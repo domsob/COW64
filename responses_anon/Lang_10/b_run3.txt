@@ -1,0 +1,628 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.lang3.time;
+o 
+o import java.io.IOException;
+o import java.io.ObjectInputStream;
+o import java.io.Serializable;
+o import java.text.DateFormatSymbols;
+o import java.text.ParseException;
+o import java.text.ParsePosition;
+o import java.util.ArrayList;
+o import java.util.Arrays;
+o import java.util.Calendar;
+o import java.util.Comparator;
+o import java.util.Date;
+o import java.util.List;
+o import java.util.Locale;
+o import java.util.Map;
+o import java.util.SortedMap;
+o import java.util.TimeZone;
+o import java.util.TreeMap;
+o import java.util.concurrent.ConcurrentHashMap;
+o import java.util.concurrent.ConcurrentMap;
+o import java.util.regex.Matcher;
+o import java.util.regex.Pattern;
+o 
+o public class FastDateParser implements DateParser, Serializable {
+o     
+o     private static final long serialVersionUID = 1L;
+o 
+o     private static final ConcurrentMap<Locale,TimeZoneStrategy> tzsCache=
+o         new ConcurrentHashMap<Locale,TimeZoneStrategy>(3);
+o 
+o     static final Locale JAPANESE_IMPERIAL = new Locale("ja","JP","JP");
+o 
+o     private final String pattern;
+o     private final TimeZone timeZone;
+o     private final Locale locale;
+o 
+o     private transient Pattern parsePattern;
+o     private transient Strategy[] strategies;
+o     private transient int thisYear;
+o     private transient ConcurrentMap<Integer, KeyValue[]> nameValues;
+o 
+o     private transient String currentFormatField;
+o     private transient Strategy nextStrategy;
+o 
+o     protected FastDateParser(String pattern, TimeZone timeZone, Locale locale) {
+o         this.pattern = pattern;
+o         this.timeZone = timeZone;
+o         this.locale = locale;
+o         init();
+o     }
+o 
+o     private void init() {
+o         thisYear= Calendar.getInstance(timeZone, locale).get(Calendar.YEAR);
+o 
+o         nameValues= new ConcurrentHashMap<Integer, KeyValue[]>();
+o 
+o         StringBuilder regex= new StringBuilder();
+o         List<Strategy> collector = new ArrayList<Strategy>();
+o 
+o         Matcher patternMatcher= formatPattern.matcher(pattern);
+o         if(!patternMatcher.lookingAt()) {
+o             throw new IllegalArgumentException("Invalid pattern");
+o         }
+o 
+o         currentFormatField= patternMatcher.group();
+o         Strategy currentStrategy= getStrategy(currentFormatField);
+o         for(;;) {
+o             patternMatcher.region(patternMatcher.end(), patternMatcher.regionEnd());
+o             if(!patternMatcher.lookingAt()) {
+o                 nextStrategy = null;
+o                 break;
+o             }
+o             String nextFormatField= patternMatcher.group();
+o             nextStrategy = getStrategy(nextFormatField);
+o             if(currentStrategy.addRegex(this, regex)) {
+o                 collector.add(currentStrategy);
+o             }
+o             currentFormatField= nextFormatField;
+o             currentStrategy= nextStrategy;
+o         }
+o         if(currentStrategy.addRegex(this, regex)) {
+o             collector.add(currentStrategy);
+o         }
+o         currentFormatField= null;
+o         strategies= collector.toArray(new Strategy[collector.size()]);
+o         parsePattern= Pattern.compile(regex.toString());
+o     }
+o 
+o     @Override
+o     public String getPattern() {
+o         return pattern;
+o     }
+o 
+o     @Override
+o     public TimeZone getTimeZone() {
+o         return timeZone;
+o     }
+o 
+o     @Override
+o     public Locale getLocale() {
+o         return locale;
+o     }
+o 
+o     Pattern getParsePattern() {
+o         return parsePattern;
+o     }
+o 
+o     @Override
+o     public boolean equals(Object obj) {
+o         if (! (obj instanceof FastDateParser) ) {
+o             return false;
+o         }
+o         FastDateParser other = (FastDateParser) obj;
+o         return pattern.equals(other.pattern)
+o             && timeZone.equals(other.timeZone)
+o             && locale.equals(other.locale);
+o     }
+o 
+o     @Override
+o     public int hashCode() {
+o         return pattern.hashCode() + 13 * (timeZone.hashCode() + 13 * locale.hashCode());
+o     }
+o 
+o     @Override
+o     public String toString() {
+o         return "FastDateParser[" + pattern + "," + locale + "," + timeZone.getID() + "]";
+o     }
+o 
+o     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+o         in.defaultReadObject();
+o         init();
+o     }
+o 
+o     @Override
+o     public Object parseObject(String source) throws ParseException {
+o         return parse(source);
+o     }
+o 
+o     @Override
+o     public Date parse(String source) throws ParseException {
+o         Date date= parse(source, new ParsePosition(0));
+o         if(date==null) {
+o             
+o             if (locale.equals(JAPANESE_IMPERIAL)) {
+o                 throw new ParseException(
+o                         "(The " +locale + " locale does not support dates before 1868 AD)\n" +
+o                                 "Unparseable date: \""+source+"\" does not match "+parsePattern.pattern(), 0);
+o             }
+o             throw new ParseException("Unparseable date: \""+source+"\" does not match "+parsePattern.pattern(), 0);
+o         }
+o         return date;
+o     }
+o 
+o     @Override
+o     public Object parseObject(String source, ParsePosition pos) {
+o         return parse(source, pos);
+o     }
+o 
+o     @Override
+o     public Date parse(String source, ParsePosition pos) {
+o         int offset= pos.getIndex();
+o         Matcher matcher= parsePattern.matcher(source.substring(offset));
+o         if(!matcher.lookingAt()) {
+o             return null;
+o         }
+o         
+o         Calendar cal= Calendar.getInstance(timeZone, locale);
+o         cal.clear();
+o 
+o         for(int i=0; i<strategies.length;) {
+o             Strategy strategy= strategies[i++];
+o             strategy.setCalendar(this, cal, matcher.group(i));
+o         }
+o         pos.setIndex(offset+matcher.end());
+o         return cal.getTime();
+o     }
+o 
+o     private static StringBuilder escapeRegex(StringBuilder regex, String value, boolean unquote) {
+o         boolean wasWhite= false;
+o         for(int i= 0; i<value.length(); ++i) {
+o             char c= value.charAt(i);
+o              if(Character.isWhitespace(c)) {
+o                  if(!wasWhite) {
+o                      wasWhite= true;
+-                      regex.append("\\s*+");
++                      regex.append(c);
+o                  }
+o                  continue;
+o              }
+o             wasWhite= false;
+o             switch(c) {
+o             case '\'':
+o                 if(unquote) {
+o                     if(++i==value.length()) {
+o                         return regex;
+o                     }
+o                     c= value.charAt(i);
+o                 }
+o                 break;
+o             case '?':
+o             case '[':
+o             case ']':
+o             case '(':
+o             case ')':
+o             case '{':
+o             case '}':
+o             case '\\':
+o             case '|':
+o             case '*':
+o             case '+':
+o             case '^':
+o             case '$':
+o             case '.':
+o                 regex.append('\\');
+o             }
+o             regex.append(c);
+o         }
+o         return regex;
+o     }
+o 
+o     private static class KeyValue {
+o         public String key;
+o         public int value;
+o 
+o         public KeyValue(String key, int value) {
+o             this.key= key;
+o             this.value= value;
+o         }
+o     }
+o 
+o     private static final Comparator<KeyValue> IGNORE_CASE_COMPARATOR = new Comparator<KeyValue> () {
+o         @Override
+o         public int compare(KeyValue left, KeyValue right) {
+o             return left.key.compareToIgnoreCase(right.key);
+o         }
+o     };
+o 
+o     KeyValue[] getDisplayNames(int field) {
+o         Integer fieldInt = Integer.valueOf(field);
+o         KeyValue[] fieldKeyValues= nameValues.get(fieldInt);
+o         if(fieldKeyValues==null) {
+o             DateFormatSymbols symbols= DateFormatSymbols.getInstance(locale);
+o             switch(field) {
+o             case Calendar.ERA:
+o                 
+o                 Calendar c = Calendar.getInstance(locale);
+o                 
+o                 String[] shortEras = toArray(c.getDisplayNames(Calendar.ERA, Calendar.SHORT, locale));
+o                 String[] longEras = toArray(c.getDisplayNames(Calendar.ERA, Calendar.LONG, locale));
+o                 fieldKeyValues= createKeyValues(longEras, shortEras);
+o                 break;
+o             case Calendar.DAY_OF_WEEK:
+o                 fieldKeyValues= createKeyValues(symbols.getWeekdays(), symbols.getShortWeekdays());
+o                 break;
+o             case Calendar.AM_PM:
+o                 fieldKeyValues= createKeyValues(symbols.getAmPmStrings(), null);
+o                 break;
+o             case Calendar.MONTH:
+o                 fieldKeyValues= createKeyValues(symbols.getMonths(), symbols.getShortMonths());
+o                 break;
+o             default:
+o                 throw new IllegalArgumentException("Invalid field value "+field);
+o             }
+o             KeyValue[] prior = nameValues.putIfAbsent(fieldInt, fieldKeyValues);
+o             if(prior!=null) {
+o                 fieldKeyValues= prior;
+o             }
+o         }
+o         return fieldKeyValues;
+o     }
+o 
+o     private String[] toArray(Map<String, Integer> era) {
+o         String[] eras = new String[era.size()]; 
+o         for(Map.Entry<String, Integer> me : era.entrySet()) {
+o             int idx = me.getValue().intValue();
+o             final String key = me.getKey();
+o             if (key == null) {
+o                 throw new IllegalArgumentException();
+o             }
+o             eras[idx] = key;
+o         }
+o         return eras;
+o     }
+o 
+o     private static KeyValue[] createKeyValues(String[] longValues, String[] shortValues) {
+o         KeyValue[] fieldKeyValues= new KeyValue[count(longValues)+count(shortValues)];
+o         copy(fieldKeyValues, copy(fieldKeyValues, 0, longValues), shortValues);
+o         Arrays.sort(fieldKeyValues, IGNORE_CASE_COMPARATOR);
+o         return fieldKeyValues;
+o     }
+o 
+o     private static int count(String[] values) {
+o         int count= 0;
+o         if(values!=null) {
+o             for(String value : values) {
+o                 if(value.length()>0) {
+o                     ++count;
+o                 }
+o             }
+o         }
+o         return count;
+o     }
+o 
+o     private static int copy(KeyValue[] fieldKeyValues, int offset, String[] values) {
+o         if(values!=null) {
+o             for(int i= 0; i<values.length; ++i) {
+o                 String value= values[i];
+o                 if(value.length()>0) {
+o                     fieldKeyValues[offset++]= new KeyValue(value, i);
+o                 }
+o             }
+o         }
+o         return offset;
+o     }
+o 
+o     int adjustYear(int twoDigitYear) {
+o         int trial= twoDigitYear + thisYear - thisYear%100;
+o         if(trial < thisYear+20) {
+o             return trial;
+o         }
+o         return trial-100;
+o     }
+o 
+o     boolean isNextNumber() {
+o         return nextStrategy!=null && nextStrategy.isNumber();
+o     }
+o 
+o     int getFieldWidth() {
+o         return currentFormatField.length();
+o     }
+o 
+o     private interface Strategy {
+o         
+o         boolean isNumber();
+o         
+o         void setCalendar(FastDateParser parser, Calendar cal, String value);
+o         
+o         boolean addRegex(FastDateParser parser, StringBuilder regex);
+o     }
+o 
+o     private static final Pattern formatPattern= Pattern.compile(
+o             "D+|E+|F+|G+|H+|K+|M+|S+|W+|Z+|a+|d+|h+|k+|m+|s+|w+|y+|z+|''|'[^']++(''[^']*+)*+'|[^'A-Za-z]++");
+o 
+o     private Strategy getStrategy(String formatField) {
+o         switch(formatField.charAt(0)) {
+o         case '\'':
+o             if(formatField.length()>2) {
+o                 formatField= formatField.substring(1, formatField.length()-1);
+o             }
+o             
+o         default:
+o             return new CopyQuotedStrategy(formatField);
+o         case 'D':
+o             return DAY_OF_YEAR_STRATEGY;
+o         case 'E':
+o             return DAY_OF_WEEK_STRATEGY;
+o         case 'F':
+o             return DAY_OF_WEEK_IN_MONTH_STRATEGY;
+o         case 'G':
+o             return ERA_STRATEGY;
+o         case 'H':
+o             return MODULO_HOUR_OF_DAY_STRATEGY;
+o         case 'K':
+o             return HOUR_STRATEGY;
+o         case 'M':
+o             return formatField.length()>=3 ?TEXT_MONTH_STRATEGY :NUMBER_MONTH_STRATEGY;
+o         case 'S':
+o             return MILLISECOND_STRATEGY;
+o         case 'W':
+o             return WEEK_OF_MONTH_STRATEGY;
+o         case 'Z':
+o             break;
+o         case 'a':
+o             return AM_PM_STRATEGY;
+o         case 'd':
+o             return DAY_OF_MONTH_STRATEGY;
+o         case 'h':
+o             return MODULO_HOUR_STRATEGY;
+o         case 'k':
+o             return HOUR_OF_DAY_STRATEGY;
+o         case 'm':
+o             return MINUTE_STRATEGY;
+o         case 's':
+o             return SECOND_STRATEGY;
+o         case 'w':
+o             return WEEK_OF_YEAR_STRATEGY;
+o         case 'y':
+o             return formatField.length()>2 ?LITERAL_YEAR_STRATEGY :ABBREVIATED_YEAR_STRATEGY;
+o         case 'z':
+o             break;
+o         }
+o         TimeZoneStrategy tzs= tzsCache.get(locale);
+o         if(tzs==null) {
+o             tzs= new TimeZoneStrategy(locale);
+o             TimeZoneStrategy inCache= tzsCache.putIfAbsent(locale, tzs);
+o             if(inCache!=null) {
+o                 return inCache;
+o             }
+o         }
+o         return tzs;
+o     }
+o 
+o     private static class CopyQuotedStrategy implements Strategy {
+o         private final String formatField;
+o 
+o         CopyQuotedStrategy(String formatField) {
+o             this.formatField= formatField;
+o         }
+o 
+o         @Override
+o         public boolean isNumber() {
+o             char c= formatField.charAt(0);
+o             if(c=='\'') {
+o                 c= formatField.charAt(1);
+o             }
+o             return Character.isDigit(c);
+o         }
+o 
+o         @Override
+o         public boolean addRegex(FastDateParser parser, StringBuilder regex) {
+o             escapeRegex(regex, formatField, true);
+o             return false;
+o         }
+o 
+o         @Override
+o         public void setCalendar(FastDateParser parser, Calendar cal, String value) {
+o         }
+o     }
+o 
+o     private static class TextStrategy implements Strategy {
+o         private final int field;
+o 
+o         TextStrategy(int field) {
+o             this.field= field;
+o         }
+o 
+o         @Override
+o         public boolean isNumber() {
+o             return false;
+o         }
+o 
+o         @Override
+o         public boolean addRegex(FastDateParser parser, StringBuilder regex) {
+o             regex.append('(');
+o             for(KeyValue textKeyValue : parser.getDisplayNames(field)) {
+o                 escapeRegex(regex, textKeyValue.key, false).append('|');
+o             }
+o             regex.setCharAt(regex.length()-1, ')');
+o             return true;
+o         }
+o 
+o         @Override
+o         public void setCalendar(FastDateParser parser, Calendar cal, String value) {
+o             KeyValue[] textKeyValues= parser.getDisplayNames(field);
+o             int idx= Arrays.binarySearch(textKeyValues, new KeyValue(value, -1), IGNORE_CASE_COMPARATOR);
+o             if(idx<0) {
+o                 StringBuilder sb= new StringBuilder(value);
+o                 sb.append(" not in (");
+o                 for(KeyValue textKeyValue : textKeyValues) {
+o                     sb.append(textKeyValue.key).append(' ');
+o                 }
+o                 sb.setCharAt(sb.length()-1, ')');
+o                 throw new IllegalArgumentException(sb.toString());
+o             }
+o             cal.set(field, textKeyValues[idx].value);
+o         }
+o     }
+o 
+o     private static class NumberStrategy implements Strategy {
+o         protected final int field;
+o 
+o         NumberStrategy(int field) {
+o              this.field= field;
+o         }
+o 
+o         @Override
+o         public boolean isNumber() {
+o             return true;
+o         }
+o 
+o         @Override
+o         public boolean addRegex(FastDateParser parser, StringBuilder regex) {
+o             if(parser.isNextNumber()) {
+o                 regex.append("(\\p{IsNd}{").append(parser.getFieldWidth()).append("}+)");
+o             }
+o             else {
+o                 regex.append("(\\p{IsNd}++)");
+o             }
+o             return true;
+o         }
+o 
+o         @Override
+o         public void setCalendar(FastDateParser parser, Calendar cal, String value) {
+o             cal.set(field, modify(Integer.parseInt(value)));
+o         }
+o 
+o         public int modify(int iValue) {
+o             return iValue;
+o         }
+o     }
+o 
+o     private static final Strategy ABBREVIATED_YEAR_STRATEGY = new NumberStrategy(Calendar.YEAR) {
+o         
+o         @Override
+o         public void setCalendar(FastDateParser parser, Calendar cal, String value) {
+o             int iValue= Integer.parseInt(value);
+o             if(iValue<100) {
+o                 iValue= parser.adjustYear(iValue);
+o             }
+o             cal.set(Calendar.YEAR, iValue);
+o         }
+o     };
+o 
+o     private static class TimeZoneStrategy implements Strategy {
+o 
+o         final String validTimeZoneChars;
+o         final SortedMap<String, TimeZone> tzNames= new TreeMap<String, TimeZone>(String.CASE_INSENSITIVE_ORDER);
+o 
+o         TimeZoneStrategy(Locale locale) {
+o             for(String id : TimeZone.getAvailableIDs()) {
+o                 if(id.startsWith("GMT")) {
+o                     continue;
+o                 }
+o                 TimeZone tz= TimeZone.getTimeZone(id);
+o                 tzNames.put(tz.getDisplayName(false, TimeZone.SHORT, locale), tz);
+o                 tzNames.put(tz.getDisplayName(false, TimeZone.LONG, locale), tz);
+o                 if(tz.useDaylightTime()) {
+o                     tzNames.put(tz.getDisplayName(true, TimeZone.SHORT, locale), tz);
+o                     tzNames.put(tz.getDisplayName(true, TimeZone.LONG, locale), tz);
+o                 }
+o             }
+o             StringBuilder sb= new StringBuilder();
+o             sb.append("(GMT[+\\-]\\d{0,1}\\d{2}|[+\\-]\\d{2}:?\\d{2}|");
+o             for(String id : tzNames.keySet()) {
+o                 escapeRegex(sb, id, false).append('|');
+o             }
+o             sb.setCharAt(sb.length()-1, ')');
+o             validTimeZoneChars= sb.toString();
+o         }
+o 
+o         @Override
+o         public boolean isNumber() {
+o             return false;
+o         }
+o 
+o         @Override
+o         public boolean addRegex(FastDateParser parser, StringBuilder regex) {
+o             regex.append(validTimeZoneChars);
+o             return true;
+o         }
+o 
+o         @Override
+o         public void setCalendar(FastDateParser parser, Calendar cal, String value) {
+o             TimeZone tz;
+o             if(value.charAt(0)=='+' || value.charAt(0)=='-') {
+o                 tz= TimeZone.getTimeZone("GMT"+value);
+o             }
+o             else if(value.startsWith("GMT")) {
+o                 tz= TimeZone.getTimeZone(value);
+o             }
+o             else {
+o                 tz= tzNames.get(value);
+o                 if(tz==null) {
+o                     throw new IllegalArgumentException(value + " is not a supported timezone name");
+o                 }
+o             }
+o             cal.setTimeZone(tz);
+o         }
+o     }
+o 
+o     private static final Strategy ERA_STRATEGY = new TextStrategy(Calendar.ERA);
+o     private static final Strategy DAY_OF_WEEK_STRATEGY = new TextStrategy(Calendar.DAY_OF_WEEK);
+o     private static final Strategy AM_PM_STRATEGY = new TextStrategy(Calendar.AM_PM);
+o     private static final Strategy TEXT_MONTH_STRATEGY = new TextStrategy(Calendar.MONTH);
+o 
+o     private static final Strategy NUMBER_MONTH_STRATEGY = new NumberStrategy(Calendar.MONTH) {
+o         @Override
+o         public int modify(int iValue) {
+o             return iValue-1;
+o         }
+o     };
+o     private static final Strategy LITERAL_YEAR_STRATEGY = new NumberStrategy(Calendar.YEAR);
+o     private static final Strategy WEEK_OF_YEAR_STRATEGY = new NumberStrategy(Calendar.WEEK_OF_YEAR);
+o     private static final Strategy WEEK_OF_MONTH_STRATEGY = new NumberStrategy(Calendar.WEEK_OF_MONTH);
+o     private static final Strategy DAY_OF_YEAR_STRATEGY = new NumberStrategy(Calendar.DAY_OF_YEAR);
+o     private static final Strategy DAY_OF_MONTH_STRATEGY = new NumberStrategy(Calendar.DAY_OF_MONTH);
+o     private static final Strategy DAY_OF_WEEK_IN_MONTH_STRATEGY = new NumberStrategy(Calendar.DAY_OF_WEEK_IN_MONTH);
+o     private static final Strategy HOUR_OF_DAY_STRATEGY = new NumberStrategy(Calendar.HOUR_OF_DAY);
+o     private static final Strategy MODULO_HOUR_OF_DAY_STRATEGY = new NumberStrategy(Calendar.HOUR_OF_DAY) {
+o         @Override
+o         public int modify(int iValue) {
+o             return iValue%24;
+o         }
+o     };
+o     private static final Strategy MODULO_HOUR_STRATEGY = new NumberStrategy(Calendar.HOUR) {
+o         @Override
+o         public int modify(int iValue) {
+o             return iValue%12;
+o         }
+o     };
+o     private static final Strategy HOUR_STRATEGY = new NumberStrategy(Calendar.HOUR);
+o     private static final Strategy MINUTE_STRATEGY = new NumberStrategy(Calendar.MINUTE);
+o     private static final Strategy SECOND_STRATEGY = new NumberStrategy(Calendar.SECOND);
+o     private static final Strategy MILLISECOND_STRATEGY = new NumberStrategy(Calendar.MILLISECOND);
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary in order to modify the behavior of the escapeRegex() method.
+Consequence: The impact of this change is that the escapeRegex() method will now handle whitespace characters differently.
+Position: The change was implemented in the escapeRegex() method.
+Cause: The previous implementation of the escapeRegex() method did not handle whitespace characters correctly.
+Change: The code in the escapeRegex() method was modified to handle whitespace characters by checking if the current character is whitespace and appending it to the StringBuilder without escaping it.
