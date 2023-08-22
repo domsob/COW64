@@ -1,0 +1,127 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.math3.stat.inference;
+o 
+o import org.apache.commons.math3.distribution.NormalDistribution;
+o import org.apache.commons.math3.exception.ConvergenceException;
+o import org.apache.commons.math3.exception.MaxCountExceededException;
+o import org.apache.commons.math3.exception.NoDataException;
+o import org.apache.commons.math3.exception.NullArgumentException;
+o import org.apache.commons.math3.stat.ranking.NaNStrategy;
+o import org.apache.commons.math3.stat.ranking.NaturalRanking;
+o import org.apache.commons.math3.stat.ranking.TiesStrategy;
+o import org.apache.commons.math3.util.FastMath;
+o 
+o public class MannWhitneyUTest {
+o 
+o     private NaturalRanking naturalRanking;
+o 
+o     public MannWhitneyUTest() {
+o         naturalRanking = new NaturalRanking(NaNStrategy.FIXED,
+o                 TiesStrategy.AVERAGE);
+o     }
+o 
+o     public MannWhitneyUTest(final NaNStrategy nanStrategy,
+o                             final TiesStrategy tiesStrategy) {
+o         naturalRanking = new NaturalRanking(nanStrategy, tiesStrategy);
+o     }
+o 
+o     private void ensureDataConformance(final double[] x, final double[] y)
+o         throws NullArgumentException, NoDataException {
+o 
+o         if (x == null ||
+o             y == null) {
+o             throw new NullArgumentException();
+o         }
+o         if (x.length == 0 ||
+o             y.length == 0) {
+o             throw new NoDataException();
+o         }
+o     }
+o 
+o     private double[] concatenateSamples(final double[] x, final double[] y) {
+o         final double[] z = new double[x.length + y.length];
+o 
+o         System.arraycopy(x, 0, z, 0, x.length);
+o         System.arraycopy(y, 0, z, x.length, y.length);
+o 
+o         return z;
+o     }
+o 
+o     public double mannWhitneyU(final double[] x, final double[] y)
+o         throws NullArgumentException, NoDataException {
+o 
+o         ensureDataConformance(x, y);
+o 
+o         final double[] z = concatenateSamples(x, y);
+o         final double[] ranks = naturalRanking.rank(z);
+o 
+o         double sumRankX = 0;
+o 
+o         for (int i = 0; i < x.length; ++i) {
+o             sumRankX += ranks[i];
+o         }
+o 
+o         final double U1 = sumRankX - (x.length * (x.length + 1)) / 2;
+o 
+o         final double U2 = x.length * y.length - U1;
+o 
+o         return FastMath.max(U1, U2);
+o     }
+o 
+o     private double calculateAsymptoticPValue(final double Umin,
+o                                              final int n1,
+o                                               final int n2)
+o          throws ConvergenceException, MaxCountExceededException {
+o  
+-          final int n1n2prod = n1 * n2;
++          final double n1n2prod = n1 * n2;
+o  
+o          final double EU = n1n2prod / 2.0;
+o         final double VarU = n1n2prod * (n1 + n2 + 1) / 12.0;
+o 
+o         final double z = (Umin - EU) / FastMath.sqrt(VarU);
+o 
+o         final NormalDistribution standardNormal = new NormalDistribution(0, 1);
+o 
+o         return 2 * standardNormal.cumulativeProbability(z);
+o     }
+o 
+o     public double mannWhitneyUTest(final double[] x, final double[] y)
+o         throws NullArgumentException, NoDataException,
+o         ConvergenceException, MaxCountExceededException {
+o 
+o         ensureDataConformance(x, y);
+o 
+o         final double Umax = mannWhitneyU(x, y);
+o 
+o         final double Umin = x.length * y.length - Umax;
+o 
+o         return calculateAsymptoticPValue(Umin, x.length, y.length);
+o     }
+o 
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary to ensure that the calculation of the variable "n1n2prod" in the method "calculateAsymptoticPValue" is stored as a double instead of an int.
+
+Consequence: The potential impact of this change is that the variable "n1n2prod" will now be stored as a double instead of an int, providing more accurate calculations.
+
+Position: The change was implemented in the method "calculateAsymptoticPValue" of the "MannWhitneyUTest" class.
+
+Cause: The previous implementation used an int variable to store the product of "n1" and "n2" in the calculation of the asymptotic p-value. However, using an int variable could lead to inaccurate calculations if the product is large.
+
+Change: The code was modified to change the variable type of "n1n2prod" from int to double in the method "calculateAsymptoticPValue" of the "MannWhitneyUTest" class. This ensures that the product is stored accurately and provides more precise calculations.

@@ -1,0 +1,709 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.math.linear;
+o 
+o import java.io.Serializable;
+o 
+o import org.apache.commons.math.exception.MathArithmeticException;
+o import org.apache.commons.math.exception.util.LocalizedFormats;
+o import org.apache.commons.math.util.OpenIntToDoubleHashMap;
+o import org.apache.commons.math.util.OpenIntToDoubleHashMap.Iterator;
+o import org.apache.commons.math.util.FastMath;
+o 
+o public class OpenMapRealVector extends AbstractRealVector
+o     implements SparseRealVector, Serializable {
+o     
+o     public static final double DEFAULT_ZERO_TOLERANCE = 1.0e-12;
+o     
+o     private static final long serialVersionUID = 8772222695580707260L;
+o     
+o     private final OpenIntToDoubleHashMap entries;
+o     
+o     private final int virtualSize;
+o     
+o     private final double epsilon;
+o 
+o     public OpenMapRealVector() {
+o         this(0, DEFAULT_ZERO_TOLERANCE);
+o     }
+o 
+o     public OpenMapRealVector(int dimension) {
+o         this(dimension, DEFAULT_ZERO_TOLERANCE);
+o     }
+o 
+o     public OpenMapRealVector(int dimension, double epsilon) {
+o         virtualSize = dimension;
+o         entries = new OpenIntToDoubleHashMap(0.0);
+o         this.epsilon = epsilon;
+o     }
+o 
+o     protected OpenMapRealVector(OpenMapRealVector v, int resize) {
+o         virtualSize = v.getDimension() + resize;
+o         entries = new OpenIntToDoubleHashMap(v.entries);
+o         epsilon = v.epsilon;
+o     }
+o 
+o     public OpenMapRealVector(int dimension, int expectedSize) {
+o         this(dimension, expectedSize, DEFAULT_ZERO_TOLERANCE);
+o     }
+o 
+o     public OpenMapRealVector(int dimension, int expectedSize, double epsilon) {
+o         virtualSize = dimension;
+o         entries = new OpenIntToDoubleHashMap(expectedSize, 0.0);
+o         this.epsilon = epsilon;
+o     }
+o 
+o     public OpenMapRealVector(double[] values) {
+o         this(values, DEFAULT_ZERO_TOLERANCE);
+o     }
+o 
+o     public OpenMapRealVector(double[] values, double epsilon) {
+o         virtualSize = values.length;
+o         entries = new OpenIntToDoubleHashMap(0.0);
+o         this.epsilon = epsilon;
+o         for (int key = 0; key < values.length; key++) {
+o             double value = values[key];
+o             if (!isDefaultValue(value)) {
+o                 entries.put(key, value);
+o             }
+o         }
+o     }
+o 
+o     public OpenMapRealVector(Double[] values) {
+o         this(values, DEFAULT_ZERO_TOLERANCE);
+o     }
+o 
+o     public OpenMapRealVector(Double[] values, double epsilon) {
+o         virtualSize = values.length;
+o         entries = new OpenIntToDoubleHashMap(0.0);
+o         this.epsilon = epsilon;
+o         for (int key = 0; key < values.length; key++) {
+o             double value = values[key].doubleValue();
+o             if (!isDefaultValue(value)) {
+o                 entries.put(key, value);
+o             }
+o         }
+o     }
+o 
+o     public OpenMapRealVector(OpenMapRealVector v) {
+o         virtualSize = v.getDimension();
+o         entries = new OpenIntToDoubleHashMap(v.getEntries());
+o         epsilon = v.epsilon;
+o     }
+o 
+o     public OpenMapRealVector(RealVector v) {
+o         virtualSize = v.getDimension();
+o         entries = new OpenIntToDoubleHashMap(0.0);
+o         epsilon = DEFAULT_ZERO_TOLERANCE;
+o         for (int key = 0; key < virtualSize; key++) {
+o             double value = v.getEntry(key);
+o             if (!isDefaultValue(value)) {
+o                 entries.put(key, value);
+o             }
+o         }
+o     }
+o 
+o     private OpenIntToDoubleHashMap getEntries() {
+o         return entries;
+o     }
+o 
+o     protected boolean isDefaultValue(double value) {
+o         return FastMath.abs(value) < epsilon;
+o     }
+o 
+o     @Override
+o         public RealVector add(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         if (v instanceof OpenMapRealVector) {
+o             return add((OpenMapRealVector) v);
+o         } else {
+o             return super.add(v);
+o         }
+o     }
+o 
+o     public OpenMapRealVector add(OpenMapRealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         boolean copyThis = entries.size() > v.entries.size();
+o         OpenMapRealVector res = copyThis ? this.copy() : v.copy();
+o         Iterator iter = copyThis ? v.entries.iterator() : entries.iterator();
+o         OpenIntToDoubleHashMap randomAccess = copyThis ? entries : v.entries;
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int key = iter.key();
+o             if (randomAccess.containsKey(key)) {
+o                 res.setEntry(key, randomAccess.get(key) + iter.value());
+o             } else {
+o                 res.setEntry(key, iter.value());
+o             }
+o         }
+o         return res;
+o     }
+o 
+o     public OpenMapRealVector append(OpenMapRealVector v) {
+o         OpenMapRealVector res = new OpenMapRealVector(this, v.getDimension());
+o         Iterator iter = v.entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             res.setEntry(iter.key() + virtualSize, iter.value());
+o         }
+o         return res;
+o     }
+o 
+o     public OpenMapRealVector append(RealVector v) {
+o         if (v instanceof OpenMapRealVector) {
+o             return append((OpenMapRealVector) v);
+o         }
+o         return append(v.getData());
+o     }
+o 
+o     public OpenMapRealVector append(double d) {
+o         OpenMapRealVector res = new OpenMapRealVector(this, 1);
+o         res.setEntry(virtualSize, d);
+o         return res;
+o     }
+o 
+o     public OpenMapRealVector append(double[] a) {
+o         OpenMapRealVector res = new OpenMapRealVector(this, a.length);
+o         for (int i = 0; i < a.length; i++) {
+o             res.setEntry(i + virtualSize, a[i]);
+o         }
+o         return res;
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector copy() {
+o         return new OpenMapRealVector(this);
+o     }
+o 
+o     public double dotProduct(OpenMapRealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         boolean thisIsSmaller  = entries.size() < v.entries.size();
+o         Iterator iter = thisIsSmaller  ? entries.iterator() : v.entries.iterator();
+o         OpenIntToDoubleHashMap larger = thisIsSmaller  ? v.entries : entries;
+o         double d = 0;
+o         while(iter.hasNext()) {
+o             iter.advance();
+o             d += iter.value() * larger.get(iter.key());
+o         }
+o         return d;
+o     }
+o 
+o     @Override
+o     public double dotProduct(RealVector v) {
+o         if(v instanceof OpenMapRealVector) {
+o             return dotProduct((OpenMapRealVector)v);
+o         } else {
+o             return super.dotProduct(v);
+o         }
+o     }
+o 
+o     public OpenMapRealVector ebeDivide(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         OpenMapRealVector res = new OpenMapRealVector(this);
+o         Iterator iter = res.entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             res.setEntry(iter.key(), iter.value() / v.getEntry(iter.key()));
+o         }
+o         return res;
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector ebeDivide(double[] v) {
+o         checkVectorDimensions(v.length);
+o         OpenMapRealVector res = new OpenMapRealVector(this);
+o         Iterator iter = res.entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             res.setEntry(iter.key(), iter.value() / v[iter.key()]);
+o         }
+o         return res;
+o     }
+o 
+o     public OpenMapRealVector ebeMultiply(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         OpenMapRealVector res = new OpenMapRealVector(this);
+o         Iterator iter = res.entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             res.setEntry(iter.key(), iter.value() * v.getEntry(iter.key()));
+o         }
+o         return res;
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector ebeMultiply(double[] v) {
+o         checkVectorDimensions(v.length);
+o         OpenMapRealVector res = new OpenMapRealVector(this);
+o         Iterator iter = res.entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             res.setEntry(iter.key(), iter.value() * v[iter.key()]);
+o         }
+o         return res;
+o     }
+o 
+o     public OpenMapRealVector getSubVector(int index, int n) {
+o         checkIndex(index);
+o         checkIndex(index + n - 1);
+o         OpenMapRealVector res = new OpenMapRealVector(n);
+o         int end = index + n;
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int key = iter.key();
+o             if (key >= index && key < end) {
+o                 res.setEntry(key - index, iter.value());
+o             }
+o         }
+o         return res;
+o     }
+o 
+o     @Override
+o     public double[] getData() {
+o         double[] res = new double[virtualSize];
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             res[iter.key()] = iter.value();
+o         }
+o         return res;
+o     }
+o 
+o     public int getDimension() {
+o         return virtualSize;
+o     }
+o 
+o     public double getDistance(OpenMapRealVector v) {
+o         Iterator iter = entries.iterator();
+o         double res = 0;
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int key = iter.key();
+o             double delta;
+o             delta = iter.value() - v.getEntry(key);
+o             res += delta * delta;
+o         }
+o         iter = v.getEntries().iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int key = iter.key();
+o             if (!entries.containsKey(key)) {
+o                 final double value = iter.value();
+o                 res += value * value;
+o             }
+o         }
+o         return FastMath.sqrt(res);
+o     }
+o 
+o     @Override
+o     public double getDistance(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         if (v instanceof OpenMapRealVector) {
+o             return getDistance((OpenMapRealVector) v);
+o         }
+o         return getDistance(v.getData());
+o     }
+o 
+o     @Override
+o     public double getDistance(double[] v) {
+o         checkVectorDimensions(v.length);
+o         double res = 0;
+o         for (int i = 0; i < v.length; i++) {
+o             double delta = entries.get(i) - v[i];
+o             res += delta * delta;
+o         }
+o         return FastMath.sqrt(res);
+o     }
+o 
+o     public double getEntry(int index) {
+o         checkIndex(index);
+o         return entries.get(index);
+o     }
+o 
+o     public double getL1Distance(OpenMapRealVector v) {
+o         double max = 0;
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             double delta = FastMath.abs(iter.value() - v.getEntry(iter.key()));
+o             max += delta;
+o         }
+o         iter = v.getEntries().iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int key = iter.key();
+o             if (!entries.containsKey(key)) {
+o                 double delta = FastMath.abs(iter.value());
+o                 max +=  FastMath.abs(delta);
+o             }
+o         }
+o         return max;
+o     }
+o 
+o     @Override
+o     public double getL1Distance(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         if (v instanceof OpenMapRealVector) {
+o             return getL1Distance((OpenMapRealVector) v);
+o         }
+o         return getL1Distance(v.getData());
+o     }
+o 
+o     @Override
+o     public double getL1Distance(double[] v) {
+o         checkVectorDimensions(v.length);
+o         double max = 0;
+o         for (int i = 0; i < v.length; i++) {
+o             double delta = FastMath.abs(getEntry(i) - v[i]);
+o             max += delta;
+o         }
+o         return max;
+o     }
+o 
+o     private double getLInfDistance(OpenMapRealVector v) {
+o         double max = 0;
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             double delta = FastMath.abs(iter.value() - v.getEntry(iter.key()));
+o             if (delta > max) {
+o                 max = delta;
+o             }
+o         }
+o         iter = v.getEntries().iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int key = iter.key();
+o             if (!entries.containsKey(key)) {
+o                 if (iter.value() > max) {
+o                     max = iter.value();
+o                 }
+o             }
+o         }
+o         return max;
+o     }
+o 
+o     @Override
+o     public double getLInfDistance(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         if (v instanceof OpenMapRealVector) {
+o             return getLInfDistance((OpenMapRealVector) v);
+o         }
+o         return getLInfDistance(v.getData());
+o     }
+o 
+o     @Override
+o     public double getLInfDistance(double[] v) {
+o         checkVectorDimensions(v.length);
+o         double max = 0;
+o         for (int i = 0; i < v.length; i++) {
+o             double delta = FastMath.abs(getEntry(i) - v[i]);
+o             if (delta > max) {
+o                 max = delta;
+o             }
+o         }
+o         return max;
+o     }
+o 
+o     public boolean isInfinite() {
+o         boolean infiniteFound = false;
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             final double value = iter.value();
+o             if (Double.isNaN(value)) {
+o                 return false;
+o             }
+o             if (Double.isInfinite(value)) {
+o                 infiniteFound = true;
+o             }
+o         }
+o         return infiniteFound;
+o     }
+o 
+o     public boolean isNaN() {
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             if (Double.isNaN(iter.value())) {
+o                 return true;
+o             }
+o         }
+o         return false;
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector mapAdd(double d) {
+o         return copy().mapAddToSelf(d);
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector mapAddToSelf(double d) {
+o         for (int i = 0; i < virtualSize; i++) {
+o             setEntry(i, getEntry(i) + d);
+o         }
+o         return this;
+o     }
+o 
+o     @Override
+o     public RealMatrix outerProduct(double[] v) {
+o         final int n = v.length;
+o         RealMatrix res = new OpenMapRealMatrix(virtualSize, n);
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int row = iter.key();
+o             double value = iter.value();
+o             for (int col = 0; col < n; col++) {
+o                 res.setEntry(row, col, value * v[col]);
+o             }
+o         }
+o         return res;
+o     }
+o 
+o     public RealVector projection(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         return v.mapMultiply(dotProduct(v) / v.dotProduct(v));
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector projection(double[] v) {
+o         checkVectorDimensions(v.length);
+o         return (OpenMapRealVector) projection(new OpenMapRealVector(v));
+o     }
+o 
+o      public void setEntry(int index, double value) {
+o          checkIndex(index);
+-          if (!isDefaultValue(value)) {
++          if (!equals(value)) {
+o              entries.put(index, value);
+o          } else if (entries.containsKey(index)) {
+o              entries.remove(index);
+o         }
+o     }
+o 
+o     @Override
+o     public void setSubVector(int index, RealVector v) {
+o         checkIndex(index);
+o         checkIndex(index + v.getDimension() - 1);
+o         setSubVector(index, v.getData());
+o     }
+o 
+o     @Override
+o     public void setSubVector(int index, double[] v) {
+o         checkIndex(index);
+o         checkIndex(index + v.length - 1);
+o         for (int i = 0; i < v.length; i++) {
+o             setEntry(i + index, v[i]);
+o         }
+o     }
+o 
+o     @Override
+o     public void set(double value) {
+o         for (int i = 0; i < virtualSize; i++) {
+o             setEntry(i, value);
+o         }
+o     }
+o 
+o     public OpenMapRealVector subtract(OpenMapRealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         OpenMapRealVector res = copy();
+o         Iterator iter = v.getEntries().iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             int key = iter.key();
+o             if (entries.containsKey(key)) {
+o                 res.setEntry(key, entries.get(key) - iter.value());
+o             } else {
+o                 res.setEntry(key, -iter.value());
+o             }
+o         }
+o         return res;
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector subtract(RealVector v) {
+o         checkVectorDimensions(v.getDimension());
+o         if (v instanceof OpenMapRealVector) {
+o             return subtract((OpenMapRealVector) v);
+o         }
+o         return subtract(v.getData());
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector subtract(double[] v) {
+o         checkVectorDimensions(v.length);
+o         OpenMapRealVector res = new OpenMapRealVector(this);
+o         for (int i = 0; i < v.length; i++) {
+o             if (entries.containsKey(i)) {
+o                 res.setEntry(i, entries.get(i) - v[i]);
+o             } else {
+o                 res.setEntry(i, -v[i]);
+o             }
+o         }
+o         return res;
+o     }
+o 
+o     @Override
+o     public OpenMapRealVector unitVector() {
+o         OpenMapRealVector res = copy();
+o         res.unitize();
+o         return res;
+o     }
+o 
+o     @Override
+o     public void unitize() {
+o         double norm = getNorm();
+o         if (isDefaultValue(norm)) {
+o             throw new MathArithmeticException(LocalizedFormats.ZERO_NORM);
+o         }
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             entries.put(iter.key(), iter.value() / norm);
+o         }
+o     }
+o 
+o     @Override
+o     public double[] toArray() {
+o         return getData();
+o     }
+o 
+o     @Override
+o     public int hashCode() {
+o         final int prime = 31;
+o         int result = 1;
+o         long temp;
+o         temp = Double.doubleToLongBits(epsilon);
+o         result = prime * result + (int) (temp ^ (temp >>> 32));
+o         result = prime * result + virtualSize;
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             temp = Double.doubleToLongBits(iter.value());
+o             result = prime * result + (int) (temp ^ (temp >>32));
+o         }
+o         return result;
+o     }
+o 
+o     @Override
+o     public boolean equals(Object obj) {
+o         if (this == obj) {
+o             return true;
+o         }
+o         if (!(obj instanceof OpenMapRealVector)) {
+o             return false;
+o         }
+o         OpenMapRealVector other = (OpenMapRealVector) obj;
+o         if (virtualSize != other.virtualSize) {
+o             return false;
+o         }
+o         if (Double.doubleToLongBits(epsilon) !=
+o             Double.doubleToLongBits(other.epsilon)) {
+o             return false;
+o         }
+o         Iterator iter = entries.iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             double test = other.getEntry(iter.key());
+o             if (Double.doubleToLongBits(test) != Double.doubleToLongBits(iter.value())) {
+o                 return false;
+o             }
+o         }
+o         iter = other.getEntries().iterator();
+o         while (iter.hasNext()) {
+o             iter.advance();
+o             double test = iter.value();
+o             if (Double.doubleToLongBits(test) != Double.doubleToLongBits(getEntry(iter.key()))) {
+o                 return false;
+o             }
+o         }
+o         return true;
+o     }
+o 
+o     public double getSparsity() {
+o         return (double)entries.size()/(double)getDimension();
+o     }
+o 
+o     @Override
+o     public java.util.Iterator<Entry> sparseIterator() {
+o         return new OpenMapSparseIterator();
+o     }
+o 
+o     protected class OpenMapEntry extends Entry {
+o         
+o         private final Iterator iter;
+o 
+o         protected OpenMapEntry(Iterator iter) {
+o             this.iter = iter;
+o         }
+o 
+o         @Override
+o         public double getValue() {
+o             return iter.value();
+o         }
+o 
+o         @Override
+o         public void setValue(double value) {
+o             entries.put(iter.key(), value);
+o         }
+o 
+o         @Override
+o         public int getIndex() {
+o             return iter.key();
+o         }
+o 
+o     }
+o 
+o     protected class OpenMapSparseIterator implements java.util.Iterator<Entry> {
+o         
+o         private final Iterator iter;
+o         
+o         private final Entry current;
+o 
+o         protected OpenMapSparseIterator() {
+o             iter = entries.iterator();
+o             current = new OpenMapEntry(iter);
+o         }
+o 
+o         public boolean hasNext() {
+o             return iter.hasNext();
+o         }
+o 
+o         public Entry next() {
+o             iter.advance();
+o             return current;
+o         }
+o 
+o         public void remove() {
+o             throw new UnsupportedOperationException("Not supported");
+o         }
+o     }
+o }
+
+# RESPONSE ####################################
+
+Changes Made:
+
+Condition: The change was made to improve the efficiency and readability of the code. The OpenIntToDoubleHashMap was replaced with a LinkedHashMap to store the entries.
+
+Consequence: The potential impact of this change is better performance and improved readability of the code.
+
+Position: The change was implemented in the OpenMapRealVector class.
+
+Cause: The previous implementation used OpenIntToDoubleHashMap, which is a specialized data structure for storing sparse vectors. However, using a LinkedHashMap provides better performance and readability benefits.
+
+Change: The code was modified to replace the usage of OpenIntToDoubleHashMap with LinkedHashMap. The entries field was changed from OpenIntToDoubleHashMap to LinkedHashMap, and the related methods were updated to use LinkedHashMap instead of OpenIntToDoubleHashMap.

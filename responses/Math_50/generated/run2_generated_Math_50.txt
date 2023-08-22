@@ -1,0 +1,204 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.math.analysis.solvers;
+o 
+o import org.apache.commons.math.util.FastMath;
+o import org.apache.commons.math.analysis.UnivariateRealFunction;
+o import org.apache.commons.math.exception.MathInternalError;
+o 
+o public abstract class BaseSecantSolver
+o     extends AbstractUnivariateRealSolver
+o     implements BracketedUnivariateRealSolver<UnivariateRealFunction> {
+o 
+o     protected static final double DEFAULT_ABSOLUTE_ACCURACY = 1e-6;
+o 
+o     private AllowedSolution allowed;
+o 
+o     private final Method method;
+o 
+o     protected BaseSecantSolver(final double absoluteAccuracy, final Method method) {
+o         super(absoluteAccuracy);
+o         this.allowed = AllowedSolution.ANY_SIDE;
+o         this.method = method;
+o     }
+o 
+o     protected BaseSecantSolver(final double relativeAccuracy,
+o                                final double absoluteAccuracy,
+o                                final Method method) {
+o         super(relativeAccuracy, absoluteAccuracy);
+o         this.allowed = AllowedSolution.ANY_SIDE;
+o         this.method = method;
+o     }
+o 
+o     protected BaseSecantSolver(final double relativeAccuracy,
+o                                final double absoluteAccuracy,
+o                                final double functionValueAccuracy,
+o                                final Method method) {
+o         super(relativeAccuracy, absoluteAccuracy, functionValueAccuracy);
+o         this.allowed = AllowedSolution.ANY_SIDE;
+o         this.method = method;
+o     }
+o 
+o     public double solve(final int maxEval, final UnivariateRealFunction f,
+o                         final double min, final double max,
+o                         final AllowedSolution allowedSolution) {
+o         return solve(maxEval, f, min, max, min + 0.5 * (max - min), allowedSolution);
+o     }
+o 
+o     public double solve(final int maxEval, final UnivariateRealFunction f,
+o                         final double min, final double max, final double startValue,
+o                         final AllowedSolution allowedSolution) {
+o         this.allowed = allowedSolution;
+o         return super.solve(maxEval, f, min, max, startValue);
+o     }
+o 
+o     @Override
+o     public double solve(final int maxEval, final UnivariateRealFunction f,
+o                         final double min, final double max, final double startValue) {
+o         return solve(maxEval, f, min, max, startValue, AllowedSolution.ANY_SIDE);
+o     }
+o 
+o     protected final double doSolve() {
+o         
+o         double x0 = getMin();
+o         double x1 = getMax();
+o         double f0 = computeObjectiveValue(x0);
+o         double f1 = computeObjectiveValue(x1);
+o 
+o         if (f0 == 0.0) {
+o             return x0;
+o         }
+o         if (f1 == 0.0) {
+o             return x1;
+o         }
+o 
+o         verifyBracketing(x0, x1);
+o 
+o         final double ftol = getFunctionValueAccuracy();
+o         final double atol = getAbsoluteAccuracy();
+o         final double rtol = getRelativeAccuracy();
+o 
+o         boolean inverted = false;
+o 
+o         while (true) {
+o             
+o             final double x = x1 - ((f1 * (x1 - x0)) / (f1 - f0));
+o             final double fx = computeObjectiveValue(x);
+o 
+o             if (fx == 0.0) {
+o                 return x;
+o             }
+o 
+o             if (f1 * fx < 0) {
+o                 
+o                 x0 = x1;
+o                 f0 = f1;
+o                 inverted = !inverted;
+o             } else {
+o                 switch (method) {
+o                 case ILLINOIS:
+o                     f0 *= 0.5;
+o                     break;
+o                 case PEGASUS:
+o                     f0 *= f1 / (f1 + fx);
+o                     break;
+o                  case REGULA_FALSI:
+o                      
+o                      if (x == x1) {
+-                          x0 = 0.5 * (x0 + x1 - FastMath.max(rtol * FastMath.abs(x1), atol));
++                          x0 = 0.5 * (getEvaluations() + x1 - FastMath.max(rtol * FastMath.abs(x1), atol));
+o                          f0 = computeObjectiveValue(x0);
+o                      }
+o                      break;
+o                 default:
+o                     
+o                     throw new MathInternalError();
+o                 }
+o             }
+o             
+o             x1 = x;
+o             f1 = fx;
+o 
+o             if (FastMath.abs(f1) <= ftol) {
+o                 switch (allowed) {
+o                 case ANY_SIDE:
+o                     return x1;
+o                 case LEFT_SIDE:
+o                     if (inverted) {
+o                         return x1;
+o                     }
+o                     break;
+o                 case RIGHT_SIDE:
+o                     if (!inverted) {
+o                         return x1;
+o                     }
+o                     break;
+o                 case BELOW_SIDE:
+o                     if (f1 <= 0) {
+o                         return x1;
+o                     }
+o                     break;
+o                 case ABOVE_SIDE:
+o                     if (f1 >= 0) {
+o                         return x1;
+o                     }
+o                     break;
+o                 default:
+o                     throw new MathInternalError();
+o                 }
+o             }
+o 
+o             if (FastMath.abs(x1 - x0) < FastMath.max(rtol * FastMath.abs(x1),
+o                                                      atol)) {
+o                 switch (allowed) {
+o                 case ANY_SIDE:
+o                     return x1;
+o                 case LEFT_SIDE:
+o                     return inverted ? x1 : x0;
+o                 case RIGHT_SIDE:
+o                     return inverted ? x0 : x1;
+o                 case BELOW_SIDE:
+o                     return (f1 <= 0) ? x1 : x0;
+o                 case ABOVE_SIDE:
+o                     return (f1 >= 0) ? x1 : x0;
+o                 default:
+o                     throw new MathInternalError();
+o                 }
+o             }
+o         }
+o     }
+o 
+o     protected enum Method {
+o 
+o         REGULA_FALSI,
+o 
+o         ILLINOIS,
+o 
+o         PEGASUS;
+o 
+o     }
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary to fix a potential bug in the REGULA_FALSI method of the BaseSecantSolver class. 
+
+Consequence: The potential impact of this change is that the REGULA_FALSI method will now correctly compute the initial value of x0 when x is equal to x1.
+
+Position: The change was implemented in the solve() method of the BaseSecantSolver class, specifically in the case for the REGULA_FALSI method.
+
+Cause: The previous implementation of the REGULA_FALSI method did not correctly compute the initial value of x0 when x is equal to x1. This could lead to incorrect results or an infinite loop.
+
+Change: The code was modified to compute the initial value of x0 as 0.5 * (getEvaluations() + x1 - FastMath.max(rtol * FastMath.abs(x1), atol)) when x is equal to x1. This ensures that the initial value of x0 is properly computed and avoids any potential issues with the REGULA_FALSI method.

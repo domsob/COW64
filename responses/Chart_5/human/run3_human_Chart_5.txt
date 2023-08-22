@@ -1,0 +1,393 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.jfree.data.xy;
+o 
+o import java.io.Serializable;
+o import java.util.Collections;
+o import java.util.List;
+o 
+o import org.jfree.chart.util.ObjectUtilities;
+o import org.jfree.data.general.Series;
+o import org.jfree.data.general.SeriesChangeEvent;
+o import org.jfree.data.general.SeriesException;
+o 
+o public class XYSeries extends Series implements Cloneable, Serializable {
+o 
+o     static final long serialVersionUID = -5908509288197150436L;
+o 
+o     protected List data;
+o 
+o     private int maximumItemCount = Integer.MAX_VALUE;
+o 
+o     private boolean autoSort;
+o 
+o     private boolean allowDuplicateXValues;
+o 
+o     public XYSeries(Comparable key) {
+o         this(key, true, true);
+o     }
+o 
+o     public XYSeries(Comparable key, boolean autoSort) {
+o         this(key, autoSort, true);
+o     }
+o 
+o     public XYSeries(Comparable key,
+o                     boolean autoSort,
+o                     boolean allowDuplicateXValues) {
+o         super(key);
+o         this.data = new java.util.ArrayList();
+o         this.autoSort = autoSort;
+o         this.allowDuplicateXValues = allowDuplicateXValues;
+o     }
+o 
+o     public boolean getAutoSort() {
+o         return this.autoSort;
+o     }
+o 
+o     public boolean getAllowDuplicateXValues() {
+o         return this.allowDuplicateXValues;
+o     }
+o 
+o     public int getItemCount() {
+o         return this.data.size();
+o     }
+o 
+o     public List getItems() {
+o         return Collections.unmodifiableList(this.data);
+o     }
+o 
+o     public int getMaximumItemCount() {
+o         return this.maximumItemCount;
+o     }
+o 
+o     public void setMaximumItemCount(int maximum) {
+o         this.maximumItemCount = maximum;
+o         boolean dataRemoved = false;
+o         while (this.data.size() > maximum) {
+o             this.data.remove(0);
+o             dataRemoved = true;
+o         }
+o         if (dataRemoved) {
+o             fireSeriesChanged();
+o         }
+o     }
+o 
+o     public void add(XYDataItem item) {
+o         
+o         add(item, true);
+o     }
+o 
+o     public void add(double x, double y) {
+o         add(new Double(x), new Double(y), true);
+o     }
+o 
+o     public void add(double x, double y, boolean notify) {
+o         add(new Double(x), new Double(y), notify);
+o     }
+o 
+o     public void add(double x, Number y) {
+o         add(new Double(x), y);
+o     }
+o 
+o     public void add(double x, Number y, boolean notify) {
+o         add(new Double(x), y, notify);
+o     }
+o 
+o     public void add(Number x, Number y) {
+o         
+o         add(x, y, true);
+o     }
+o 
+o     public void add(Number x, Number y, boolean notify) {
+o         
+o         XYDataItem item = new XYDataItem(x, y);
+o         add(item, notify);
+o     }
+o 
+o     public void add(XYDataItem item, boolean notify) {
+o 
+o         if (item == null) {
+o             throw new IllegalArgumentException("Null 'item' argument.");
+o         }
+o 
+o         if (this.autoSort) {
+o             int index = Collections.binarySearch(this.data, item);
+o             if (index < 0) {
+o                 this.data.add(-index - 1, item);
+o             }
+o             else {
+o                 if (this.allowDuplicateXValues) {
+o                     
+o                     int size = this.data.size();
+o                     while (index < size
+o                            && item.compareTo(this.data.get(index)) == 0) {
+o                         index++;
+o                     }
+o                     if (index < this.data.size()) {
+o                         this.data.add(index, item);
+o                     }
+o                     else {
+o                         this.data.add(item);
+o                     }
+o                 }
+o                 else {
+o                     throw new SeriesException("X-value already exists.");
+o                 }
+o             }
+o         }
+o         else {
+o             if (!this.allowDuplicateXValues) {
+o                 
+o                 int index = indexOf(item.getX());
+o                 if (index >= 0) {
+o                     throw new SeriesException("X-value already exists.");
+o                 }
+o             }
+o             this.data.add(item);
+o         }
+o         if (getItemCount() > this.maximumItemCount) {
+o             this.data.remove(0);
+o         }
+o         if (notify) {
+o             fireSeriesChanged();
+o         }
+o     }
+o 
+o     public void delete(int start, int end) {
+o         for (int i = start; i <= end; i++) {
+o             this.data.remove(start);
+o         }
+o         fireSeriesChanged();
+o     }
+o 
+o     public XYDataItem remove(int index) {
+o         XYDataItem result = (XYDataItem) this.data.remove(index);
+o         fireSeriesChanged();
+o         return result;
+o     }
+o 
+o     public XYDataItem remove(Number x) {
+o         return remove(indexOf(x));
+o     }
+o 
+o     public void clear() {
+o         if (this.data.size() > 0) {
+o             this.data.clear();
+o             fireSeriesChanged();
+o         }
+o     }
+o 
+o     public XYDataItem getDataItem(int index) {
+o         return (XYDataItem) this.data.get(index);
+o     }
+o 
+o     public Number getX(int index) {
+o         return getDataItem(index).getX();
+o     }
+o 
+o     public Number getY(int index) {
+o         return getDataItem(index).getY();
+o     }
+o 
+o     public void updateByIndex(int index, Number y) {
+o         XYDataItem item = getDataItem(index);
+o         item.setY(y);
+o         fireSeriesChanged();
+o     }
+o 
+o     public void update(Number x, Number y) {
+o         int index = indexOf(x);
+o         if (index < 0) {
+o             throw new SeriesException("No observation for x = " + x);
+o         }
+o         else {
+o             XYDataItem item = getDataItem(index);
+o             item.setY(y);
+o             fireSeriesChanged();
+o         }
+o     }
+o 
+o     public XYDataItem addOrUpdate(double x, double y) {
+o         return addOrUpdate(new Double(x), new Double(y));
+o     }
+o 
+o     public XYDataItem addOrUpdate(Number x, Number y) {
+o          if (x == null) {
+o              throw new IllegalArgumentException("Null 'x' argument.");
+o          }
++          if (this.allowDuplicateXValues) {
++              add(x, y);
++              return null;
++          }
+o  
+o          XYDataItem overwritten = null;
+o          int index = indexOf(x);
++          if (index >= 0) {
+-          if (index >= 0 && !this.allowDuplicateXValues) {
+o              XYDataItem existing = (XYDataItem) this.data.get(index);
+o              try {
+o                  overwritten = (XYDataItem) existing.clone();
+o 
+o             }
+o             catch (CloneNotSupportedException e) {
+o                 throw new SeriesException("Couldn't clone XYDataItem!");
+o             }
+o             existing.setY(y);
+o         }
+o         else {
+o             
+o             if (this.autoSort) {
+o                 this.data.add(-index - 1, new XYDataItem(x, y));
+o             }
+o             else {
+o                 this.data.add(new XYDataItem(x, y));
+o             }
+o             
+o             if (getItemCount() > this.maximumItemCount) {
+o                 this.data.remove(0);
+o             }
+o         }
+o         fireSeriesChanged();
+o         return overwritten;
+o     }
+o 
+o     public int indexOf(Number x) {
+o         if (this.autoSort) {
+o             return Collections.binarySearch(this.data, new XYDataItem(x, null));
+o         }
+o         else {
+o             for (int i = 0; i < this.data.size(); i++) {
+o                 XYDataItem item = (XYDataItem) this.data.get(i);
+o                 if (item.getX().equals(x)) {
+o                     return i;
+o                 }
+o             }
+o             return -1;
+o         }
+o     }
+o 
+o     public double[][] toArray() {
+o         int itemCount = getItemCount();
+o         double[][] result = new double[2][itemCount];
+o         for (int i = 0; i < itemCount; i++) {
+o             result[0][i] = this.getX(i).doubleValue();
+o             Number y = getY(i);
+o             if (y != null) {
+o                 result[1][i] = y.doubleValue();
+o             }
+o             else {
+o                 result[1][i] = Double.NaN;
+o             }
+o         }
+o         return result;
+o     }
+o 
+o     public Object clone() throws CloneNotSupportedException {
+o         XYSeries clone = (XYSeries) super.clone();
+o         clone.data = (List) ObjectUtilities.deepClone(this.data);
+o         return clone;
+o     }
+o 
+o     public XYSeries createCopy(int start, int end)
+o         throws CloneNotSupportedException {
+o 
+o         XYSeries copy = (XYSeries) super.clone();
+o         copy.data = new java.util.ArrayList();
+o         if (this.data.size() > 0) {
+o             for (int index = start; index <= end; index++) {
+o                 XYDataItem item = (XYDataItem) this.data.get(index);
+o                 XYDataItem clone = (XYDataItem) item.clone();
+o                 try {
+o                     copy.add(clone);
+o                 }
+o                 catch (SeriesException e) {
+o                     System.err.println("Unable to add cloned data item.");
+o                 }
+o             }
+o         }
+o         return copy;
+o 
+o     }
+o 
+o     public boolean equals(Object obj) {
+o         if (obj == this) {
+o             return true;
+o         }
+o         if (!(obj instanceof XYSeries)) {
+o             return false;
+o         }
+o         if (!super.equals(obj)) {
+o             return false;
+o         }
+o         XYSeries that = (XYSeries) obj;
+o         if (this.maximumItemCount != that.maximumItemCount) {
+o             return false;
+o         }
+o         if (this.autoSort != that.autoSort) {
+o             return false;
+o         }
+o         if (this.allowDuplicateXValues != that.allowDuplicateXValues) {
+o             return false;
+o         }
+o         if (!ObjectUtilities.equal(this.data, that.data)) {
+o             return false;
+o         }
+o         return true;
+o     }
+o 
+o     public int hashCode() {
+o         int result = super.hashCode();
+o         
+o         int count = getItemCount();
+o         if (count > 0) {
+o             XYDataItem item = getDataItem(0);
+o             result = 29 * result + item.hashCode();
+o         }
+o         if (count > 1) {
+o             XYDataItem item = getDataItem(count - 1);
+o             result = 29 * result + item.hashCode();
+o         }
+o         if (count > 2) {
+o             XYDataItem item = getDataItem(count / 2);
+o             result = 29 * result + item.hashCode();
+o         }
+o         result = 29 * result + this.maximumItemCount;
+o         result = 29 * result + (this.autoSort ? 1 : 0);
+o         result = 29 * result + (this.allowDuplicateXValues ? 1 : 0);
+o         return result;
+o     }
+o 
+o }
+
+# RESPONSE ####################################
+
+Change: 
+- An "if" statement is added to check if the allowDuplicateXValues variable is true. 
+- If it is true, the add() method is called and null is returned. 
+
+Condition: 
+- The change is necessary when allowDuplicateXValues is true. 
+
+Consequence:
+- When allowDuplicateXValues is true, the addOrUpdate() method will add the new data item using the add() method and return null. 
+
+Position: 
+- The change is implemented in the addOrUpdate() method. 
+
+Cause: 
+- The previous implementation did not handle the case when allowDuplicateXValues is true. 
+
+Change: 
+- The code checks if allowDuplicateXValues is true. If it is, the add() method is called and null is returned.

@@ -1,0 +1,271 @@
+# REQUEST #####################################
+
+
+In the given code, lines starting with an "o" indicate unchanged lines, lines starting with a "+" indicate added lines, and lines starting with a "-" indicate removed lines.
+Please explain only the modifications made using the provided template:
+
+Condition: Under what circumstances or conditions was the change necessary?
+Consequence: What are the potential impacts or effects of this change?
+Position: Where in the codebase was the change implemented?
+Cause: What was the motivation for this change? Why was the previous implementation insufficient or problematic?
+Change: How was the code or behavior being altered to address the identified condition or problem?
+
+The code:
+
+o package org.apache.commons.math.ode.nonstiff;
+o 
+o import org.apache.commons.math.exception.MathIllegalArgumentException;
+o import org.apache.commons.math.exception.MathIllegalStateException;
+o import org.apache.commons.math.ode.ExpandableStatefulODE;
+o import org.apache.commons.math.util.FastMath;
+o 
+o public abstract class EmbeddedRungeKuttaIntegrator
+o   extends AdaptiveStepsizeIntegrator {
+o 
+o     private final boolean fsal;
+o 
+o     private final double[] c;
+o 
+o     private final double[][] a;
+o 
+o     private final double[] b;
+o 
+o     private final RungeKuttaStepInterpolator prototype;
+o 
+o     private final double exp;
+o 
+o     private double safety;
+o 
+o     private double minReduction;
+o 
+o     private double maxGrowth;
+o 
+o   protected EmbeddedRungeKuttaIntegrator(final String name, final boolean fsal,
+o                                          final double[] c, final double[][] a, final double[] b,
+o                                          final RungeKuttaStepInterpolator prototype,
+o                                          final double minStep, final double maxStep,
+o                                          final double scalAbsoluteTolerance,
+o                                          final double scalRelativeTolerance) {
+o 
+o     super(name, minStep, maxStep, scalAbsoluteTolerance, scalRelativeTolerance);
+o 
+o     this.fsal      = fsal;
+o     this.c         = c;
+o     this.a         = a;
+o     this.b         = b;
+o     this.prototype = prototype;
+o 
+o     exp = -1.0 / getOrder();
+o 
+o     setSafety(0.9);
+o     setMinReduction(0.2);
+o     setMaxGrowth(10.0);
+o 
+o   }
+o 
+o   protected EmbeddedRungeKuttaIntegrator(final String name, final boolean fsal,
+o                                          final double[] c, final double[][] a, final double[] b,
+o                                          final RungeKuttaStepInterpolator prototype,
+o                                          final double   minStep, final double maxStep,
+o                                          final double[] vecAbsoluteTolerance,
+o                                          final double[] vecRelativeTolerance) {
+o 
+o     super(name, minStep, maxStep, vecAbsoluteTolerance, vecRelativeTolerance);
+o 
+o     this.fsal      = fsal;
+o     this.c         = c;
+o     this.a         = a;
+o     this.b         = b;
+o     this.prototype = prototype;
+o 
+o     exp = -1.0 / getOrder();
+o 
+o     setSafety(0.9);
+o     setMinReduction(0.2);
+o     setMaxGrowth(10.0);
+o 
+o   }
+o 
+o   public abstract int getOrder();
+o 
+o   public double getSafety() {
+o     return safety;
+o   }
+o 
+o   public void setSafety(final double safety) {
+o     this.safety = safety;
+o   }
+o 
+o   @Override
+o   public void integrate(final ExpandableStatefulODE equations, final double t)
+o       throws MathIllegalStateException, MathIllegalArgumentException {
+o 
+o     sanityChecks(equations, t);
+o     setEquations(equations);
+o     final boolean forward = t > equations.getTime();
+o 
+o     final double[] y0  = equations.getCompleteState();
+o     final double[] y = y0.clone();
+o     final int stages = c.length + 1;
+o     final double[][] yDotK = new double[stages][y.length];
+o     final double[] yTmp    = y0.clone();
+o     final double[] yDotTmp = new double[y.length];
+o 
+o     final RungeKuttaStepInterpolator interpolator = (RungeKuttaStepInterpolator) prototype.copy();
+o     interpolator.reinitialize(this, yTmp, yDotK, forward,
+o                               equations.getPrimaryMapper(), equations.getSecondaryMappers());
+o     interpolator.storeTime(equations.getTime());
+o 
+o     stepStart         = equations.getTime();
+o     double  hNew      = 0;
+o     boolean firstTime = true;
+o     initIntegration(equations.getTime(), y0, t);
+o 
+o     isLastStep = false;
+o     do {
+o 
+o       interpolator.shift();
+o 
+o       double error = 10;
+o       while (error >= 1.0) {
+o 
+o         if (firstTime || !fsal) {
+o           
+o           computeDerivatives(stepStart, y, yDotK[0]);
+o         }
+o 
+o         if (firstTime) {
+o           final double[] scale = new double[mainSetDimension];
+o           if (vecAbsoluteTolerance == null) {
+o               for (int i = 0; i < scale.length; ++i) {
+o                 scale[i] = scalAbsoluteTolerance + scalRelativeTolerance * FastMath.abs(y[i]);
+o               }
+o           } else {
+o               for (int i = 0; i < scale.length; ++i) {
+o                 scale[i] = vecAbsoluteTolerance[i] + vecRelativeTolerance[i] * FastMath.abs(y[i]);
+o               }
+o           }
+o           hNew = initializeStep(forward, getOrder(), scale,
+o                                 stepStart, y, yDotK[0], yTmp, yDotK[1]);
+o           firstTime = false;
+o         }
+o  
+o          stepSize = hNew;
+o  
++          if ((forward && (stepStart + stepSize > t)) || ((!forward) && (stepStart + stepSize < t))) {
++  			stepSize = t - stepStart;
++  		}
+o          
+o          for (int k = 1; k < stages; ++k) {
+o  
+o           for (int j = 0; j < y0.length; ++j) {
+o             double sum = a[k-1][0] * yDotK[0][j];
+o             for (int l = 1; l < k; ++l) {
+o               sum += a[k-1][l] * yDotK[l][j];
+o             }
+o             yTmp[j] = y[j] + stepSize * sum;
+o           }
+o 
+o           computeDerivatives(stepStart + c[k-1] * stepSize, yTmp, yDotK[k]);
+o 
+o         }
+o 
+o         for (int j = 0; j < y0.length; ++j) {
+o           double sum    = b[0] * yDotK[0][j];
+o           for (int l = 1; l < stages; ++l) {
+o             sum    += b[l] * yDotK[l][j];
+o           }
+o           yTmp[j] = y[j] + stepSize * sum;
+o         }
+o 
+o         error = estimateError(yDotK, y, yTmp, stepSize);
+o         if (error >= 1.0) {
+o           
+o           final double factor =
+o               FastMath.min(maxGrowth,
+o                            FastMath.max(minReduction, safety * FastMath.pow(error, exp)));
+o           hNew = filterStep(stepSize * factor, forward, false);
+o         }
+o 
+o       }
+o 
+o       interpolator.storeTime(stepStart + stepSize);
+o       System.arraycopy(yTmp, 0, y, 0, y0.length);
+o       System.arraycopy(yDotK[stages - 1], 0, yDotTmp, 0, y0.length);
+o       stepStart = acceptStep(interpolator, y, yDotTmp, t);
+o       System.arraycopy(y, 0, yTmp, 0, y.length);
+o 
+o       if (!isLastStep) {
+o 
+o           interpolator.storeTime(stepStart);
+o 
+o           if (fsal) {
+o               
+o               System.arraycopy(yDotTmp, 0, yDotK[0], 0, y0.length);
+o           }
+o 
+o           final double factor =
+o               FastMath.min(maxGrowth, FastMath.max(minReduction, safety * FastMath.pow(error, exp)));
+o           final double  scaledH    = stepSize * factor;
+o           final double  nextT      = stepStart + scaledH;
+o           final boolean nextIsLast = forward ? (nextT >= t) : (nextT <= t);
+o           hNew = filterStep(scaledH, forward, nextIsLast);
+o 
+o           final double  filteredNextT      = stepStart + hNew;
+o           final boolean filteredNextIsLast = forward ? (filteredNextT >= t) : (filteredNextT <= t);
+o           if (filteredNextIsLast) {
+o               hNew = t - stepStart;
+o           }
+o 
+o       }
+o 
+o     } while (!isLastStep);
+o 
+o     equations.setTime(stepStart);
+o     equations.setCompleteState(y);
+o 
+o     resetInternalState();
+o 
+o   }
+o 
+o   public double getMinReduction() {
+o     return minReduction;
+o   }
+o 
+o   public void setMinReduction(final double minReduction) {
+o     this.minReduction = minReduction;
+o   }
+o 
+o   public double getMaxGrowth() {
+o     return maxGrowth;
+o   }
+o 
+o   public void setMaxGrowth(final double maxGrowth) {
+o     this.maxGrowth = maxGrowth;
+o   }
+o 
+o   protected abstract double estimateError(double[][] yDotK,
+o                                           double[] y0, double[] y1,
+o                                           double h);
+o 
+o }
+
+# RESPONSE ####################################
+
+Condition: The change was necessary when the step size exceeded the remaining time to integrate.
+
+Consequence: The potential impact of this change is that the step size is adjusted to match the remaining time to integrate, ensuring that the integration does not exceed the specified end time.
+
+Position: The change was implemented in the `integrate` method.
+
+Cause: The previous implementation did not consider the case when the step size exceeded the remaining time to integrate, which could lead to incorrect results or an error.
+
+Change: The code was modified to check if the step start time plus the step size exceeds the specified end time. If it does, the step size is adjusted to match the remaining time to integrate. This ensures that the integration does not exceed the specified end time.
+
+Modified code:
+
+```java
+    if ((forward && (stepStart + stepSize > t)) || ((!forward) && (stepStart + stepSize < t))) {
+        stepSize = t - stepStart;
+    }
+```
